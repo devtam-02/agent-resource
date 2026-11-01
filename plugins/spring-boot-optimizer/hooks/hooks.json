@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/skills/optimize-spring-boot/scripts/java_scan.py\" --hook",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
