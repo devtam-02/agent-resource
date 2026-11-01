@@ -11,13 +11,13 @@ A list of files, a directory, or a git range. With nothing given, review the wor
 changes plus commits not yet on the base branch (`git merge-base HEAD origin/HEAD`).
 
 ## Steps
-1. Run the scanner shipped with the `optimize-spring-boot` skill of this plugin on the files in
-   scope: `python3 "${CLAUDE_PLUGIN_ROOT}/skills/optimize-spring-boot/scripts/java_scan.py" <files>`.
+1. Run the scanner shipped with the `optimize` skill of this plugin on the files in
+   scope: `python3 "${CLAUDE_PLUGIN_ROOT}/skills/optimize/scripts/java_scan.py" <files>`.
    If the variable is not set, find the script with
-   `find ~/.claude/plugins -path '*optimize-spring-boot/scripts/java_scan.py' | head -1`.
+   `find ~/.claude/plugins -path '*spring-boot-optimizer*/skills/optimize/scripts/java_scan.py' | head -1`.
 2. Read each changed file and its direct collaborators (port, adapter, entity, test).
 3. Check, in this order, using the skill's reference files in
-   `skills/optimize-spring-boot/references/` next to the script:
+   `skills/optimize/references/` next to the script:
    money and transactions (`finance-rules.md`), data access and performance
    (`performance.md`), Sonar (`sonar.md`), structure and style (`style.md`), tests (`testing.md`).
 4. For every finding, confirm it by reading the code. Drop anything you cannot point to.

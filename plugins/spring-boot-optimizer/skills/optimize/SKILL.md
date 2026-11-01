@@ -1,5 +1,5 @@
 ---
-name: optimize-spring-boot
+name: optimize
 description: >
   Review and optimize Java / Spring Boot code: Sonar self-check (S3776, S1192, S125, S1128),
   money and transaction safety (BigDecimal, idempotency, @Transactional boundaries),
@@ -7,12 +7,21 @@ description: >
   handling, logging/PII, hexagonal structure, and test quality. Use when the user asks to
   optimize, refactor, review, clean up or harden Spring Boot code, or says "tối ưu code",
   "review code java", "rà soát service", "sửa lỗi sonar", "tối ưu hiệu năng".
+argument-hint: "[file|folder] [focus: perf|money|sonar|tests]"
 ---
 
 # Optimize Spring Boot code
 
 Mục tiêu: làm code **đúng trước, nhanh sau, dễ đọc sau cùng**, theo cách viết đã chốt trong
 `references/style.md`. Thay đổi nhỏ, có test, không đổi hành vi nghiệp vụ nếu người dùng không yêu cầu.
+
+## Đầu vào
+
+Tham số khi gọi bằng `/spring-boot-optimizer:optimize`: `$ARGUMENTS`
+
+- Đường dẫn file/thư mục → phạm vi. Không có → các file đã đổi trên nhánh hiện tại.
+- Từ trọng tâm (`perf`, `money`, `sonar`, `tests`) → kiểm tra phần đó trước, nhưng vẫn báo mọi phát hiện `critical` khác trong phạm vi.
+- Được Claude tự gọi (không có tham số) → lấy phạm vi từ yêu cầu của người dùng.
 
 ## Phạm vi
 

@@ -4,7 +4,7 @@ Personal Claude Code resources, installed on a machine by
 [`dev-cli --agent-resource init`](#install) (pulls this repository, then installs).
 
 ```text
-plugins/<name>/     Claude Code plugins (skills, commands, agents, hooks)
+plugins/<name>/     Claude Code plugins (skills, agents, hooks; no legacy commands/)
 rules/*.md          rules, copied to ~/.claude/rules/dev-cli/
 memories/*.md       CLAUDE.md content, imported from ~/.claude/CLAUDE.md through one @import line
 ```
