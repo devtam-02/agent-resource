@@ -1,0 +1,17 @@
+{
+  "name": "canva-slides",
+  "description": "Turn a brief, a spec, a Jira export or a git log into a presentation: a checked outline first, then a Canva deck through Canva's official MCP server, then a PDF/PPTX export.",
+  "version": "0.1.0",
+  "author": {
+    "name": "devtam-02"
+  },
+  "keywords": [
+    "canva",
+    "slides",
+    "presentation",
+    "mcp",
+    "sprint-review",
+    "tech-talk"
+  ],
+  "privacyPolicyUrl": "https://www.canva.com/policies/privacy-policy/"
+}

@@ -14,6 +14,7 @@ memories/*.md       CLAUDE.md content, imported from ~/.claude/CLAUDE.md through
 | Plugin | Purpose |
 |---|---|
 | [`spring-boot-optimizer`](plugins/spring-boot-optimizer/) | Review and optimize Java / Spring Boot services: Sonar self-check, money and transaction safety, performance, hexagonal style, test quality. |
+| [`canva-slides`](plugins/canva-slides/) | Presentations: checked Markdown outline with speaker notes (from a topic, specs, a Jira export or a git range), then a Canva deck through Canva's MCP server, then PDF/PPTX export. |
 
 ## Install
 
@@ -26,6 +27,9 @@ dev-cli --agent-resource status      # what is installed
 
 `dev-cli` builds a local marketplace from `plugins/` and installs each plugin with
 `claude plugin install`; no version bump is needed after an edit.
+
+Plugins that declare a remote MCP server (`canva-slides`) need a one-time login: `/mcp` →
+the server → Authenticate. Tokens stay in Claude Code, never in this repository.
 
 Without `dev-cli`, try a plugin for one session:
 
