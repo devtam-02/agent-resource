@@ -15,6 +15,7 @@ memories/*.md       CLAUDE.md content, imported from ~/.claude/CLAUDE.md through
 |---|---|
 | [`spring-boot-optimizer`](plugins/spring-boot-optimizer/) | Review and optimize Java / Spring Boot services: Sonar self-check, money and transaction safety, performance, hexagonal style, test quality. |
 | [`canva-slides`](plugins/canva-slides/) | Presentations: checked Markdown outline with speaker notes (from a topic, specs, a Jira export or a git range), then a Canva deck through Canva's MCP server, then PDF/PPTX export. |
+| [`app-config-review`](plugins/app-config-review/) | Read-only review of a service's staging configuration kept in Git config repositories: plain-text secrets, risky settings, staging pointing at production, drift against UAT/production. |
 
 ## Install
 
