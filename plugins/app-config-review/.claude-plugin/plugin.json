@@ -1,7 +1,7 @@
 {
   "name": "app-config-review",
-  "description": "Review the staging configuration of a service kept in a Git config repository: secrets, risky settings, staging pointing at production resources, and drift against UAT and production.",
-  "version": "0.1.1",
+  "description": "Read service configuration from Git config repositories (app-config-access) and review an environment's configuration against the code branch that runs with it (app-config-review): missing keys, wrong types, secrets, risky settings, drift.",
+  "version": "0.2.0",
   "author": {
     "name": "devtam-02"
   },

@@ -1,19 +1,21 @@
 # app-config-review
 
-Claude Code plugin that reviews the **staging** configuration of a service kept in Git config
-repositories, read-only. Skills only, no legacy `commands/`.
+Claude Code plugin for service configuration kept in Git config repositories, read-only. Skills
+only, no legacy `commands/`.
 
-Expected layout, branch `master`:
+Expected layout, branch `master` (`APP_CONFIG_BRANCH`):
 
 ```text
-<staging repo>/<service>/staging/...        staging
-<main repo>/<service>/uat/...               UAT
-<main repo>/<service>/production/...        production
+<staging repo>/<service>/staging/...          staging
+<main repo>/<service>/<environment>/...       uat, production, and every other environment
 ```
 
-| Component | What it does |
+| Skill | What it does |
 |---|---|
-| skill `review` — `/app-config-review:review <service...> [--compare uat,production]` or `--list [text]` | Runs `config_review.py`, checks each finding against the real file, and reports by severity: plain-text secrets, secrets shared with UAT/production, staging pointing at production, risky settings (`ddl-auto`, actuator, auth off, TLS checks off, `show-sql`, timeouts), and drift against UAT/production. Claude also loads it on its own for config review requests. Reference: `rules.md` (what each rule means and its usual false positives). |
+| `app-config-access` — `/app-config-review:app-config-access` | Reads the config repositories: services, environments of a service, the config of a service for one environment with secrets masked, the local folder of it. Script `skills/app-config-access/scripts/app_config.py`, also the library the review uses. |
+| `app-config-review` — `/app-config-review:app-config-review --env <env> [--code current\|<branch>]` | Run inside a code repository. Reviews the config of `<env>` against the code that will run with it: `staging` → branch `staging`, `uat` → branch `release`, any other environment → `--code current` (working tree, uncommitted changes included) or `--code <branch>`. Reports keys the code needs but the config lacks, wrong value types, unresolved placeholders, keys nothing reads (possibly renamed), plain-text and shared secrets, secrets committed in the code repository, risky settings, other-environment addresses, and drift with `--compare`. Reference: `references/rules.md`. |
+
+Claude also loads either skill on its own for matching requests.
 
 ## Setup
 
@@ -24,8 +26,10 @@ addresses are **not** stored in this public repository. Add to that file:
 ```bash
 APP_CONFIG_STAGING_REPO=https://<host>/scm/<project>/<staging-config-repo>.git
 APP_CONFIG_REPO=https://<host>/scm/<project>/<main-config-repo>.git
-# APP_CONFIG_BRANCH=master                      # default
-# APP_CONFIG_CACHE=~/.cache/app-config-review   # default
+# APP_CONFIG_BRANCH=master                          # branch of both config repositories
+# APP_CONFIG_CACHE=~/.cache/app-config-review       # shallow clones
+# APP_CONFIG_CODE_BRANCHES=staging:staging,uat:release   # environment -> code branch
+# APP_CONFIG_LIBRARY_PREFIXES=mylib,app.common      # keys read by shared libraries, not "unused"
 ```
 
 A process environment variable with the same name wins, for one-off runs. Use `ssh://` /
@@ -33,24 +37,32 @@ A process environment variable with the same name wins, for one-off runs. Use `s
 refused. Check with:
 
 ```bash
-python3 skills/review/scripts/config_review.py doctor
+python3 skills/app-config-access/scripts/app_config.py doctor
 ```
 
-## Script
+## Scripts
 
 ```bash
-S=skills/review/scripts/config_review.py
-python3 $S list --filter <text>           # services that have a staging/ folder
-python3 $S review <service>               # text report, exit 1 when there are errors
-python3 $S review <service> --json        # same, as JSON
-python3 $S review <service> --compare ''  # staging only
+A=skills/app-config-access/scripts/app_config.py
+python3 $A list --env uat --filter <text>         # services that have a uat/ folder
+python3 $A envs <service>                         # its environments and their repository
+python3 $A show <service> --env staging           # key=value, secrets as <secret>
+
+R=skills/app-config-review/scripts/config_review.py   # run from the code repository
+python3 $R --env staging                          # code: origin/staging
+python3 $R --env uat --compare production --json  # code: origin/release
+python3 $R --env production --code master
+python3 $R --env staging --code current           # what is on disk now
+python3 $R --env staging --no-code --service <s>  # config rules only
 ```
 
-Repositories are cloned shallow into `~/.cache/app-config-review/` (override with
-`APP_CONFIG_CACHE`) and refreshed on each run (`--no-fetch` to skip). Nothing is committed or
-pushed. Secret values are never printed: findings give the key and `file:line`. Python 3 standard
-library and `git` only.
+The code branch is fetched (`git fetch origin <branch>`) and read from git objects: the working
+tree and the checked-out branch are never touched. The config repositories are cloned shallow into
+the cache and refreshed on each run (`--no-fetch` to skip). Nothing is committed or pushed. Secret
+values are never printed: findings give the key and `file:line`. Python 3 standard library and
+`git` only.
 
-Exit codes: 0 clean, 1 errors found, 2 bad argument, 3 not configured, 4 service not found, 5 git/network.
+Exit codes: 0 no error, 1 errors found, 2 bad argument (or no code branch for that environment),
+3 not configured, 4 service/branch not found, 5 git/network.
 
-Requirements: `python3`, `git`, read access to both repositories.
+Requirements: `python3`, `git`, read access to the config repositories and the code repository.

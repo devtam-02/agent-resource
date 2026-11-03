@@ -15,7 +15,7 @@ memories/*.md       CLAUDE.md content, imported from ~/.claude/CLAUDE.md through
 |---|---|
 | [`spring-boot-optimizer`](plugins/spring-boot-optimizer/) | Review and optimize Java / Spring Boot services: Sonar self-check, money and transaction safety, performance, hexagonal style, test quality. |
 | [`canva-slides`](plugins/canva-slides/) | Presentations: checked Markdown outline with speaker notes (from a topic, specs, a Jira export or a git range), then a Canva deck through Canva's MCP server, then PDF/PPTX export. |
-| [`app-config-review`](plugins/app-config-review/) | Read-only review of a service's staging configuration kept in Git config repositories: plain-text secrets, risky settings, staging pointing at production, drift against UAT/production. |
+| [`app-config-review`](plugins/app-config-review/) | Service configuration in Git config repositories, read-only. Skill `app-config-access` reads it (secrets masked); skill `app-config-review`, run in a code repository, reviews an environment's config against the matching code branch (staging → `staging`, uat → `release`, else current code or a named branch). |
 
 ## Install
 
@@ -47,12 +47,12 @@ keys of every plugin listed, commented out, in its template. Current keys:
 
 | Plugin | Keys |
 |---|---|
-| `app-config-review` | `APP_CONFIG_STAGING_REPO`, `APP_CONFIG_REPO`, `APP_CONFIG_BRANCH`, `APP_CONFIG_CACHE` |
+| `app-config-review` | `APP_CONFIG_STAGING_REPO`, `APP_CONFIG_REPO`, `APP_CONFIG_BRANCH`, `APP_CONFIG_CACHE`, `APP_CONFIG_CODE_BRANCHES`, `APP_CONFIG_LIBRARY_PREFIXES` |
 | `spring-boot-optimizer` | `SPRING_BOOT_OPTIMIZER_HOOK` (`off` silences the hook) |
 | `canva-slides` | none (Canva login is Claude Code's OAuth, `/mcp`) |
 
 New plugin settings: read them with the same small reader (copy `setting()` from
-`plugins/app-config-review/skills/review/scripts/config_review.py`), add the keys to
+`plugins/app-config-review/skills/app-config-access/scripts/app_config.py`), add the keys to
 dev-cli's `config/.env.example` and to the table above. Secrets never go in a plugin file.
 
 ## Editing
