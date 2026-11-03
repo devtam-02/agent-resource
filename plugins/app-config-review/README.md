@@ -17,20 +17,20 @@ Expected layout, branch `master`:
 
 ## Setup
 
-The repository addresses are **not** stored in this public repository. Set them where Claude Code
-can see them, for example in `~/.claude/settings.json`:
+Settings are read from dev-cli's configuration file **`~/.dev-cli/.env`** (created by
+`dev-cli`'s `install.sh` or its first run; `DEV_CLI_HOME` moves the folder). The repository
+addresses are **not** stored in this public repository. Add to that file:
 
-```json
-{
-  "env": {
-    "APP_CONFIG_STAGING_REPO": "https://<host>/scm/<project>/<staging-config-repo>.git",
-    "APP_CONFIG_REPO": "https://<host>/scm/<project>/<main-config-repo>.git"
-  }
-}
+```bash
+APP_CONFIG_STAGING_REPO=https://<host>/scm/<project>/<staging-config-repo>.git
+APP_CONFIG_REPO=https://<host>/scm/<project>/<main-config-repo>.git
+# APP_CONFIG_BRANCH=master                      # default
+# APP_CONFIG_CACHE=~/.cache/app-config-review   # default
 ```
 
-`APP_CONFIG_BRANCH` defaults to `master`. Use `ssh://` / `git@` URLs or a git credential helper for
-access; a URL with a user or password in it is refused. Check with:
+A process environment variable with the same name wins, for one-off runs. Use `ssh://` /
+`git@` URLs or a git credential helper for access; a URL with a user or password in it is
+refused. Check with:
 
 ```bash
 python3 skills/review/scripts/config_review.py doctor

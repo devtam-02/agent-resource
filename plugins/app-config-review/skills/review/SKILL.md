@@ -27,7 +27,8 @@ Tham số khi gọi bằng `/app-config-review:review`: `$ARGUMENTS`
 
 ## Cách hoạt động
 
-Dữ liệu nằm ở hai repo Git (nhánh `master`), địa chỉ lấy từ biến môi trường, **không** nằm trong plugin:
+Dữ liệu nằm ở hai repo Git (nhánh `master`). Địa chỉ đọc từ file cấu hình của dev-cli
+**`~/.dev-cli/.env`** (biến môi trường cùng tên, nếu có, được ưu tiên), **không** nằm trong plugin:
 
 | Biến | Chứa |
 |---|---|
@@ -45,8 +46,9 @@ Script `scripts/config_review.py` (cạnh file SKILL.md) clone nông vào thư m
    python3 "<thư mục skill>/scripts/config_review.py" doctor
    ```
 
-   Thiếu biến hoặc không truy cập được → dừng, nói rõ thiếu gì và chỉ người dùng tới mục *Setup* trong
-   README của plugin. Không tự đặt URL, không xin hay ghi mật khẩu/token vào đâu.
+   Thiếu khóa hoặc không truy cập được → dừng, nói rõ thiếu khóa nào trong `~/.dev-cli/.env` và chỉ
+   người dùng tới mục *Setup* trong README của plugin. Không tự đặt URL, không xin hay ghi mật khẩu/token
+   vào đâu. Chỉ sửa `~/.dev-cli/.env` khi người dùng đưa giá trị và yêu cầu rõ.
 2. **Chạy script** cho từng service:
 
    ```bash

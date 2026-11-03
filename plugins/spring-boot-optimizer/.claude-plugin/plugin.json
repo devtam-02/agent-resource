@@ -1,9 +1,16 @@
 {
   "name": "spring-boot-optimizer",
   "description": "Review and optimize Java / Spring Boot services: Sonar self-check, money and transaction safety, performance, hexagonal style, test quality. Includes a post-edit check hook for .java files.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": {
     "name": "devtam-02"
   },
-  "keywords": ["java", "spring-boot", "sonar", "performance", "code-review", "fintech"]
+  "keywords": [
+    "java",
+    "spring-boot",
+    "sonar",
+    "performance",
+    "code-review",
+    "fintech"
+  ]
 }

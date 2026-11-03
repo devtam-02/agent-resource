@@ -1,9 +1,16 @@
 {
   "name": "app-config-review",
   "description": "Review the staging configuration of a service kept in a Git config repository: secrets, risky settings, staging pointing at production resources, and drift against UAT and production.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "author": {
     "name": "devtam-02"
   },
-  "keywords": ["configuration", "staging", "spring-boot", "review", "drift", "secrets"]
+  "keywords": [
+    "configuration",
+    "staging",
+    "spring-boot",
+    "review",
+    "drift",
+    "secrets"
+  ]
 }

@@ -2,11 +2,13 @@
 """Read-only review of one service's configuration kept in Git config repositories.
 
 Layout: <repo>/<service>/<environment>/<files>. Staging lives in one repository, UAT and
-production in another. Repository URLs come from the environment, never from this file:
+production in another. Settings come from dev-cli's file ~/.dev-cli/.env (a process
+environment variable of the same name wins), never from this file:
 
     APP_CONFIG_STAGING_REPO   repository holding <service>/staging
     APP_CONFIG_REPO           repository holding <service>/uat and <service>/production
     APP_CONFIG_BRANCH         branch, default master (applies to both)
+    APP_CONFIG_CACHE          optional, cache folder of the clones
 
     config_review.py list [--filter TEXT]
     config_review.py review SERVICE [--compare uat,production] [--json] [--no-fetch]
@@ -371,12 +373,59 @@ def drift(files, env, other_files):
     return out
 
 
+# ---------------------------------------------------------------- settings
+# Settings live in dev-cli's file ~/.dev-cli/.env ($DEV_CLI_HOME moves the folder),
+# shared by dev-cli and every agent-resource plugin. A process environment variable
+# with the same name wins, for one-off runs. Same parsing rules as dev-cli: KEY=value,
+# full-line # comments, optional single or double quotes, no other processing.
+
+def dev_cli_env_path():
+    home = os.environ.get("DEV_CLI_HOME", "").strip()
+    return Path(home).expanduser() / ".env" if home else Path.home() / ".dev-cli" / ".env"
+
+
+def _read_dev_cli_env():
+    try:
+        text = dev_cli_env_path().read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return {}
+    values = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            quote, value = value[0], value[1:-1]
+            if quote == '"':
+                value = value.replace('\\"', '"').replace("\\\\", "\\")
+        if key.strip():
+            values[key.strip()] = value
+    return values
+
+
+_SETTINGS = None
+
+
+def setting(name, default=""):
+    """-> (value, source) with source "env", "file" or "default"."""
+    global _SETTINGS
+    if os.environ.get(name, "").strip():
+        return os.environ[name].strip(), "env"
+    if _SETTINGS is None:
+        _SETTINGS = _read_dev_cli_env()
+    if _SETTINGS.get(name, "").strip():
+        return _SETTINGS[name].strip(), "file"
+    return default, "default"
+
+
 # ---------------------------------------------------------------- repositories
 
 def repo_url(var):
-    url = os.environ.get(var, "").strip()
+    url, _ = setting(var)
     if not url:
-        return None, f"{var} is not set"
+        return None, f"{var} is not set in {dev_cli_env_path()}"
     parts = urlsplit(url)
     if parts.scheme not in ("http", "https", "ssh", "git", "file") and not re.match(r"^[\w.-]+@[\w.-]+:", url):
         return None, f"{var}: unsupported URL scheme"
@@ -386,14 +435,14 @@ def repo_url(var):
 
 
 def branch():
-    b = os.environ.get(ENV_BRANCH, "master").strip() or "master"
+    b = setting(ENV_BRANCH, "master")[0] or "master"
     if not BRANCH_RE.match(b) or ".." in b:
         raise SystemExit(f"{ENV_BRANCH}: invalid branch name")
     return b
 
 
 def cache_root():
-    base = os.environ.get("APP_CONFIG_CACHE") or os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "app-config-review")
+    base = setting("APP_CONFIG_CACHE")[0] or os.path.join(os.environ.get("XDG_CACHE_HOME") or os.path.expanduser("~/.cache"), "app-config-review")
     return Path(base)
 
 
@@ -444,9 +493,11 @@ def env_dir(path, service, env):
 
 def cmd_doctor(args):
     ok = True
+    print(f"settings file: {dev_cli_env_path()} ({'found' if dev_cli_env_path().is_file() else 'MISSING: run dev-cli once to create it'})")
     for var in (ENV_STAGING, ENV_MAIN):
         url, err = repo_url(var)
-        print(f"{var}: {'set' if url else 'MISSING'}" + (f" ({err})" if err and url is None and os.environ.get(var) else ""))
+        source = setting(var)[1]
+        print(f"{var}: " + (f"set ({'environment variable' if source == 'env' else 'settings file'})" if url else f"MISSING ({err})"))
         ok &= url is not None
     print(f"{ENV_BRANCH}: {branch()}")
     print(f"cache: {cache_root()}")

@@ -38,6 +38,23 @@ Without `dev-cli`, try a plugin for one session:
 claude --plugin-dir plugins/spring-boot-optimizer
 ```
 
+## Settings
+
+Plugins never keep settings in this repository. Any script, skill or hook that needs one reads
+dev-cli's configuration file **`~/.dev-cli/.env`** (`DEV_CLI_HOME` moves the folder; a process
+environment variable with the same name wins). dev-cli creates the file on install, with the
+keys of every plugin listed, commented out, in its template. Current keys:
+
+| Plugin | Keys |
+|---|---|
+| `app-config-review` | `APP_CONFIG_STAGING_REPO`, `APP_CONFIG_REPO`, `APP_CONFIG_BRANCH`, `APP_CONFIG_CACHE` |
+| `spring-boot-optimizer` | `SPRING_BOOT_OPTIMIZER_HOOK` (`off` silences the hook) |
+| `canva-slides` | none (Canva login is Claude Code's OAuth, `/mcp`) |
+
+New plugin settings: read them with the same small reader (copy `setting()` from
+`plugins/app-config-review/skills/review/scripts/config_review.py`), add the keys to
+dev-cli's `config/.env.example` and to the table above. Secrets never go in a plugin file.
+
 ## Editing
 
 Edit, commit, push. On every machine: `dev-cli --agent-resource init`. Changes take effect in a
