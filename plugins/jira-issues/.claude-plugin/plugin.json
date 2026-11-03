@@ -1,0 +1,15 @@
+{
+  "name": "jira-issues",
+  "description": "Pull Jira Server/Data Center issues read-only through dev-cli (dev-cli --jira-tool scan-issues): presets (my open, overdue, updated, worked, sprint, project) or JQL, cached JSON, compact digest with status groups and attention flags, one issue in full, JSON/Markdown files.",
+  "version": "0.1.0",
+  "author": {
+    "name": "devtam-02"
+  },
+  "keywords": [
+    "jira",
+    "issues",
+    "sprint",
+    "worklog",
+    "dev-cli"
+  ]
+}

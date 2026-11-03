@@ -16,6 +16,7 @@ memories/*.md       CLAUDE.md content, imported from ~/.claude/CLAUDE.md through
 | [`spring-boot-optimizer`](plugins/spring-boot-optimizer/) | Review and optimize Java / Spring Boot services: Sonar self-check, money and transaction safety, performance, hexagonal style, test quality. |
 | [`canva-slides`](plugins/canva-slides/) | Presentations: checked Markdown outline with speaker notes (from a topic, specs, a Jira export or a git range), then a Canva deck through Canva's MCP server, then PDF/PPTX export. |
 | [`app-config-review`](plugins/app-config-review/) | Service configuration in Git config repositories, read-only. Skill `app-config-access` reads it (secrets masked); skill `app-config-review`, run in a code repository, reviews an environment's config against the matching code branch (staging → `staging`, uat → `release`, else current code or a named branch). |
+| [`jira-issues`](plugins/jira-issues/) | Jira Server/DC issues, read-only, through `dev-cli --jira-tool scan-issues`: presets (my open, overdue, updated, worked, sprint, project) or JQL, cached JSON, compact digest with attention flags, one issue in full, JSON/Markdown files. |
 
 ## Install
 
@@ -50,6 +51,7 @@ keys of every plugin listed, commented out, in its template. Current keys:
 | `app-config-review` | `APP_CONFIG_STAGING_REPO`, `APP_CONFIG_REPO`, `APP_CONFIG_BRANCH`, `APP_CONFIG_CACHE`, `APP_CONFIG_CODE_BRANCHES`, `APP_CONFIG_LIBRARY_PREFIXES` |
 | `spring-boot-optimizer` | `SPRING_BOOT_OPTIMIZER_HOOK` (`off` silences the hook) |
 | `canva-slides` | none (Canva login is Claude Code's OAuth, `/mcp`) |
+| `jira-issues` | `JIRA_ISSUES_DEV_CLI`, `JIRA_ISSUES_CACHE`; reads `JIRA_DEFAULT_PROJECT`. Jira URL and token belong to dev-cli (`dev-cli --jira-tool --config`) |
 
 New plugin settings: read them with the same small reader (copy `setting()` from
 `plugins/app-config-review/skills/app-config-access/scripts/app_config.py`), add the keys to
