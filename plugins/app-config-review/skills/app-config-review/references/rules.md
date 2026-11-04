@@ -5,6 +5,26 @@ Cấu hình của môi trường được review đọc từ repo cấu hình; c
 Mức: `error` = sửa trước khi triển khai; `warn` = xem xét; `info` = để tham khảo.
 Mọi quy tắc là heuristic theo tên key và giá trị. Đọc file thật trước khi kết luận.
 
+## Chặn khởi chạy và 3 phần của kết quả
+
+Mỗi phát hiện có thêm `startup`: `yes` = app không khởi chạy được, `maybe` = có thể (tùy bên deploy
+hoặc tùy key có được đọc không), rỗng = app vẫn lên. Kết quả được sắp `yes` → `maybe` → còn lại, và
+gom vào `sections` của `--json`:
+
+| Phần | Gồm | Cột |
+|---|---|---|
+| `missing` — config còn thiếu | `missing-required`, `env-var-required`, `key-missing`, `file-missing` | `key`, `startup`, `cause`, `state`, `used` |
+| `wrong` — config đang/có thể sai | mọi quy tắc còn lại trong `RULE_META` | như trên |
+| `actions` — hướng xử lý | gộp theo cách sửa | `priority` (1 trước khi deploy, 2 sớm, 3 sau), `action`, `keys` |
+
+Quy tắc không có trong `RULE_META` (`code-default-used`, `code-repo-value-used`, `possibly-unused`,
+`unused-not-checked`, `profile-file-also-sets`, `key-extra`, `value-differs`, `file-only-here`) nằm
+ngoài ba bảng, in ở mục Notes: chúng không phải việc phải sửa.
+
+`startup: yes` mặc định cho `missing-required`, `type-mismatch`, `unresolved-placeholder` (chỉ khi key
+đó được code đọc; không thì `maybe`); `maybe` cho `env-var-required` và `parse`. **`yes` là kết luận
+nặng, phải mở code xác nhận trước khi báo.**
+
 ## Trên cấu hình của môi trường
 
 | Quy tắc | Mức | Khi nào báo | Sai báo thường gặp |
@@ -73,4 +93,8 @@ file không phải UTF-8, và mọi thứ khác (Dockerfile, `.conf`, `.ts`, `.x
 
 ## Thêm quy tắc
 
-Sửa `RISKY` (quy tắc theo key/giá trị), `review_config` (cấu hình) hoặc `review_against_code` (so với code) trong `scripts/config_review.py`, thêm một dòng ở bảng trên.
+Sửa `RISKY` (quy tắc theo key/giá trị), `review_config` (cấu hình) hoặc `review_against_code` (so với
+code) trong `scripts/config_review.py`, thêm một dòng ở bảng trên, **và một dòng trong `RULE_META`**
+(phần nào, nguyên nhân ngắn, cách sửa) — thiếu dòng đó thì quy tắc mới chỉ hiện ở mục Notes. Quy tắc
+làm app không khởi chạy được thì khai thêm trong `STARTUP` hoặc truyền `startup=` lúc tạo phát hiện.
+Giá trị đưa vào `state=` phải đi qua `shown()`/`mask()` để không lộ secret.

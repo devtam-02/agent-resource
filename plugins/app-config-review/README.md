@@ -13,7 +13,7 @@ Expected layout, branch `master` (`APP_CONFIG_BRANCH`):
 | Skill | What it does |
 |---|---|
 | `app-config-access` — `/app-config-review:app-config-access` | Reads the config repositories: services, environments of a service, the config of a service for one environment with secrets masked, the local folder of it. Script `skills/app-config-access/scripts/app_config.py`, also the library the review uses. |
-| `app-config-review` — `/app-config-review:app-config-review --env <env> [--code current\|<branch>]` | Run inside a code repository. Reviews the config of `<env>` against the code that will run with it: `staging` → branch `staging`, `uat` → branch `release`, any other environment → `--code current` (working tree, uncommitted changes included) or `--code <branch>`. Reports keys the code needs but the config lacks, wrong value types, unresolved placeholders, keys nothing reads (possibly renamed), plain-text and shared secrets, secrets committed in the code repository, risky settings, other-environment addresses, and drift with `--compare`. Reference: `references/rules.md`. |
+| `app-config-review` — `/app-config-review:app-config-review --env <env> [--code current\|<branch>]` | Run inside a code repository. Reviews the config of `<env>` against the code that will run with it: `staging` → branch `staging`, `uat` → branch `release`, any other environment → `--code current` (working tree, uncommitted changes included) or `--code <branch>`. It answers two questions first — **which keys are missing** and **what stops the application from starting** — then reports wrong value types, unresolved placeholders, keys nothing reads (possibly renamed), plain-text and shared secrets, secrets committed in the code repository, risky settings, other-environment addresses, and drift with `--compare`. The result comes in three tables: missing config, wrong or suspect config, what to do. Reference: `references/rules.md`. |
 
 Claude also loads either skill on its own for matching requests.
 
@@ -55,6 +55,11 @@ python3 $R --env production --code master
 python3 $R --env staging --code current           # what is on disk now
 python3 $R --env staging --no-code --service <s>  # config rules only
 ```
+
+`config_review.py` prints three tables — missing config, wrong or suspect config, what to do — with
+a start-up verdict above them; every finding carries `startup` (`yes`, `maybe` or empty) and the rows
+of the tables are in `sections` with `--json`. Findings that are not something to change (code
+defaults in use, keys nothing reads, drift details) are listed as notes below the tables.
 
 The code branch is fetched (`git fetch origin <branch>`) and read from git objects: the working
 tree and the checked-out branch are never touched. The config repositories are cloned shallow into

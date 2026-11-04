@@ -116,10 +116,12 @@ def review_config(files, other, reviewed):
         for key, (value, line) in f["entries"].items():
             v = value.strip()
             if CRED_IN_URL.search(v):
-                out.append(finding("error", "credential-in-url", name, key, "user and password inside a URL; use separate secret keys", line))
+                out.append(finding("error", "credential-in-url", name, key, "user and password inside a URL; use separate secret keys",
+                                   line, state="user:password inside the URL"))
             elif is_plain_secret(key, v):
                 out.append(finding("error", "plain-secret", name, key,
-                                   "secret stored as plain text; use a placeholder, ENC(...) or the secret store", line))
+                                   "secret stored as plain text; use a placeholder, ENC(...) or the secret store",
+                                   line, state="plain text in the config file"))
             for rid, level, key_rx, test, msg in RISKY:
                 if key_rx.search(key):
                     try:
@@ -132,18 +134,19 @@ def review_config(files, other, reviewed):
                                any(w in low for w in ("ssl", "tls", "cert", "hostname"))) or \
                               ("trust-all" in low or "trustall" in low or "insecure" in low) and v.lower() == "true"
                     if hit:
-                        out.append(finding(level, rid, name, key, msg, line))
+                        out.append(finding(level, rid, name, key, msg, line, state=shown(key, v)))
             if URL_KEY.search(key) or URL_LIKE.match(v):
                 if LOCAL_HOST.search(v) and not is_secret_key(key):
-                    out.append(finding("warn", "localhost", name, key, "points at localhost: unreachable from a container or another host", line))
+                    out.append(finding("warn", "localhost", name, key, "points at localhost: unreachable from a container or another host",
+                                       line, state=mask(v)))
                 level, marks = foreign_markers(reviewed, v)
                 if level and endpoint_value(key, v):
                     out.append(finding(level, "other-env-marker", name, key,
-                                       f"{reviewed} value mentions {', '.join(sorted(marks))}: {mask(v)}", line))
+                                       f"{reviewed} value mentions {', '.join(sorted(marks))}: {mask(v)}", line, state=mask(v)))
             if TIMEOUT_KEY.search(key) and re.fullmatch(r"-?\d+", v) and int(v) <= 0:
-                out.append(finding("warn", "timeout-zero", name, key, "timeout 0 or negative means wait forever", line))
+                out.append(finding("warn", "timeout-zero", name, key, "timeout 0 or negative means wait forever", line, state=v))
             if POOL_KEY.search(key) and re.fullmatch(r"\d+", v) and int(v) > 500:
-                out.append(finding("warn", "pool-huge", name, key, f"pool/connection limit {v} is very high", line))
+                out.append(finding("warn", "pool-huge", name, key, f"pool/connection limit {v} is very high", line, state=v))
         if f["entries"] and (name.lower().startswith("application") or name.lower().startswith("bootstrap")):
             has_http = any(k.startswith(("rest.", "feign.", "webclient.", "app.rest.")) or "http-client" in k for k in f["entries"])
             if has_http and not timeouts_seen:
@@ -184,7 +187,8 @@ def drift(files, env, other_files, reviewed):
             continue
         ka, kb = set(a["entries"]), set(b["entries"])
         for key in sorted(kb - ka):
-            out.append(finding("warn", "key-missing", name, key, f"set in {env}, missing in {reviewed}", env=env))
+            out.append(finding("warn", "key-missing", name, key, f"set in {env}, missing in {reviewed}", env=env,
+                               state=f"not set in {reviewed}", used=f"{name} of {env}"))
         extra = sorted(ka - kb)
         if extra:
             more = f" (+{len(extra) - 8} more)" if len(extra) > 8 else ""
@@ -621,7 +625,9 @@ def review_against_code(files, scan, env):
             for typ in r["types"]:
                 if not value_fits(typ, value):
                     out.append(finding("error", "type-mismatch", fname, ek,
-                                       f"{where} expects {typ}, value is {shown(ek, value)!s}", line))
+                                       f"{where} expects {typ}, value is {shown(ek, value)!s}", line,
+                                       used=where, state=shown(ek, value), expected=typ, startup="yes",
+                                       cause=f"value is not a valid {typ}"))
             continue
         if n in bundled_norm:
             bundled_only.append(key)
@@ -631,11 +637,13 @@ def review_against_code(files, scan, env):
         if r["required"]:
             if ENV_VAR_KEY.match(key):
                 out.append(finding("warn", "env-var-required", "", key,
-                                   f"{where} needs environment variable {key} (not in the config files; check the deployment)"))
+                                   f"{where} needs environment variable {key} (not in the config files; check the deployment)",
+                                   used=where, state="not set in the config files", startup="maybe"))
             else:
                 out.append(finding("error", "missing-required", "", key,
                                    f"{where} needs it without a default; neither the {env} config nor the code repository sets it "
-                                   "(start-up fails: could not resolve placeholder)"))
+                                   "(start-up fails: could not resolve placeholder)",
+                                   used=where, state=f"not set for {env}", startup="yes"))
         elif r["defaults"]:
             d = r["defaults"][0]
             defaults_used.append(f"{key}={'<secret>' if is_secret_key(key) else mask(d) if d else '(empty)'}")
@@ -685,22 +693,32 @@ def review_against_code(files, scan, env):
 
     # 3. placeholders inside config values that nothing defines
     defined = set(env_norm) | set(bundled_norm)
+    refs_by_norm = {norm(k): r for k, r in refs.items()}
     for key, (value, line, fname) in env_values.items():
         if "${" not in value:
             continue
+        # The failure happens when the property is read, so a key the code reads stops start-up.
+        r = refs_by_norm.get(norm(key))
+        used_at = (r["where"][0] if r and r["where"] else "")
+        blocks = "yes" if r else "maybe"
         for ref_key, default, _ in iter_placeholders(value):
             if default is not None or norm(ref_key) in defined:
                 continue
             if ENV_VAR_KEY.match(ref_key):
-                out.append(finding("warn", "env-var-required", fname, key, f"value needs environment variable {ref_key}", line))
+                out.append(finding("warn", "env-var-required", fname, key, f"value needs environment variable {ref_key}", line,
+                                   state=shown(key, value), used=used_at or f"{fname}:{line}", needs=ref_key, startup="maybe",
+                                   cause=f"its value needs environment variable {ref_key}"))
             else:
-                out.append(finding("error", "unresolved-placeholder", fname, key, f"value refers to ${{{ref_key}}}, defined nowhere", line))
+                out.append(finding("error", "unresolved-placeholder", fname, key, f"value refers to ${{{ref_key}}}, defined nowhere", line,
+                                   state=shown(key, value), used=used_at or f"{fname}:{line}", needs=ref_key, startup=blocks,
+                                   cause=f"${{{ref_key}}} is defined nowhere"))
 
     # 4. code repository files
     for path, entries in scan["bundled"].items():
         for key, (value, line) in entries.items():
             if is_plain_secret(key, value) or CRED_IN_URL.search(value):
-                out.append(finding("error", "secret-in-code-repo", path, key, "secret committed in the code repository", line))
+                out.append(finding("error", "secret-in-code-repo", path, key, "secret committed in the code repository", line,
+                                   state="plain text in the code repository"))
     overrides = []
     for key, (value, line, fname) in env_values.items():
         b = bundled_values.get(bundled_norm.get(norm(key), ""), None)
@@ -712,9 +730,107 @@ def review_against_code(files, scan, env):
     return out, {"active_code_config": sorted(active), "inactive_code_config": sorted(inactive)}
 
 
-# ---------------------------------------------------------------- command
+# ---------------------------------------------------------------- report sections
 
 ORDER = {"error": 0, "warn": 1, "info": 2}
+STARTUP_RANK = {"yes": 0, "maybe": 1, "": 2}
+
+#: Rules that stop the application from starting, unless the finding says otherwise.
+STARTUP = {"missing-required": "yes", "unresolved-placeholder": "yes", "type-mismatch": "yes",
+           "env-var-required": "maybe", "parse": "maybe"}
+
+#: rule -> (section, short cause or None for the rule's own message, what to do).
+#: Section "missing" = the key is not there; "wrong" = it is there but is or may be wrong.
+#: A rule that is absent from this table stays out of the tables and is printed as a note.
+RULE_META = {
+    # 1. missing
+    "missing-required": ("missing", "code reads it, no default in code", "add the key to this environment's config"),
+    "env-var-required": ("missing", "code reads an environment variable", "set it where the app is deployed (Helm/compose/CI), not in the config repository"),
+    "key-missing": ("missing", "set in the compared environment, not here", "add it, or confirm this environment does not need it"),
+    "file-missing": ("missing", "file exists in the compared environment", "add the file, or confirm it is not needed"),
+    # 2. wrong or suspect
+    "unresolved-placeholder": ("wrong", "placeholder points at a key nothing defines", "define that key, or give the placeholder a default"),
+    "type-mismatch": ("wrong", None, "correct the value to the type the code binds"),
+    "parse": ("wrong", None, "fix the syntax of the config file"),
+    "duplicate-key": ("wrong", None, "remove one of the two lines"),
+    "credential-in-url": ("wrong", None, "split the user and the password out of the URL into secret keys"),
+    "plain-secret": ("wrong", None, "move the secret to the secret store, a placeholder or ENC(...)"),
+    "secret-in-code-repo": ("wrong", None, "remove the secret from the code repository and rotate it"),
+    "secret-shared": ("wrong", None, "give each environment its own secret and rotate the shared one"),
+    "points-at-production": ("wrong", None, "point this environment at its own instance"),
+    "other-env-marker": ("wrong", None, "replace the address with this environment's own"),
+    "localhost": ("wrong", None, "use the service name or the real host"),
+    "possibly-renamed": ("wrong", None, "rename the config key to the one the code reads"),
+    "timeout-zero": ("wrong", None, "set a finite timeout"),
+    "pool-huge": ("wrong", None, "lower the limit to what the database/host allows"),
+    "no-timeout": ("wrong", None, "add connect and read timeouts"),
+    "same-endpoint": ("wrong", None, "check that sharing this address with the other environment is intended"),
+    "ddl-auto": ("wrong", None, "set validate or none and migrate with Liquibase/Flyway"),
+    "show-sql": ("wrong", None, "turn it off outside local development"),
+    "debug-flag": ("wrong", None, "turn it off outside local development"),
+    "root-log-level": ("wrong", None, "raise the root level to INFO and lower only the packages you need"),
+    "actuator-exposure": ("wrong", None, "expose only health and info"),
+    "actuator-env": ("wrong", None, "disable the endpoint or protect it"),
+    "auth-disabled": ("wrong", None, "switch authentication back on"),
+    "ssl-verify-off": ("wrong", None, "switch TLS verification back on and install the CA certificate"),
+    "swagger": ("wrong", None, "disable the API docs outside staging"),
+    "cors-any": ("wrong", None, "list the allowed origins"),
+    "h2-console": ("wrong", None, "disable the H2 console"),
+}
+
+
+def startup_of(f):
+    return f.get("startup", STARTUP.get(f["rule"], ""))
+
+
+def build_sections(findings):
+    """-> (missing rows, wrong rows, action rows, notes) for the three tables."""
+    missing, wrong, notes = [], [], []
+    for f in findings:
+        meta = RULE_META.get(f["rule"])
+        if meta is None:
+            notes.append(f)
+            continue
+        section, cause, fix = meta
+        where = f["file"] + (f":{f['line']}" if f.get("line") else "") if f["file"] else ""
+        row = {
+            "key": f["key"] or f["file"] or "-",
+            "rule": f["rule"], "level": f["level"], "startup": startup_of(f),
+            "cause": f.get("cause") or cause or f["message"],
+            "state": f.get("state") or "-",
+            "used": f.get("used") or where or "-",
+            "fix": fix,
+        }
+        (missing if section == "missing" else wrong).append(row)
+    rank = lambda r: (STARTUP_RANK[r["startup"]], ORDER[r["level"]], r["rule"], r["key"])
+    missing.sort(key=rank)
+    wrong.sort(key=rank)
+    # One row per absent key: the same key can be reported both by the code and by --compare.
+    seen, merged = {}, []
+    for row in missing:
+        first = seen.get(row["key"])
+        if first is None:
+            seen[row["key"]] = row
+            merged.append(row)
+        elif row["rule"] not in first.setdefault("also", []):
+            first["also"].append(row["rule"])
+    missing = merged
+
+    actions = {}
+    for row in missing + wrong:
+        priority = 1 if row["startup"] == "yes" else 2 if row["startup"] == "maybe" or row["level"] == "error" else 3
+        a = actions.setdefault(row["fix"], {"priority": priority, "keys": [], "rules": set()})
+        a["priority"] = min(a["priority"], priority)
+        a["rules"].add(row["rule"])
+        if row["key"] not in a["keys"]:
+            a["keys"].append(row["key"])
+    rows = [{"priority": a["priority"], "action": fix, "keys": a["keys"], "rules": sorted(a["rules"])}
+            for fix, a in actions.items()]
+    rows.sort(key=lambda a: (a["priority"], -len(a["keys"]), a["action"]))
+    return missing, wrong, rows, notes
+
+
+# ---------------------------------------------------------------- command
 
 
 def run(args):
@@ -752,14 +868,40 @@ def run(args):
         findings += code_findings
     for e, other_files in others.items():
         findings += drift(files, e, other_files, env)
-    findings.sort(key=lambda f: (ORDER[f["level"]], f["rule"], f["file"], f["key"]))
+    # Start-up blockers first: the first question is whether the app can come up at all.
+    findings.sort(key=lambda f: (STARTUP_RANK[startup_of(f)], ORDER[f["level"]], f["rule"], f["file"], f["key"]))
     counts = {lvl: sum(1 for f in findings if f["level"] == lvl) for lvl in ORDER}
+    missing, wrong, actions, note_findings = build_sections(findings)
     return {
         "service": service, "service_detected_from": how, "environment": env,
         "config": {"repository": data["repo"], "commit": data["commit"], "files": sorted(files)},
         "code": dict(code_desc or {}, **(scan["counts"] if scan else {}), **extra) if scan else None,
-        "compared": sorted(others), "notes": notes, "counts": counts, "findings": findings,
+        "compared": sorted(others), "notes": notes, "counts": counts,
+        "startup": {"blocked": sum(1 for f in findings if startup_of(f) == "yes"),
+                    "maybe": sum(1 for f in findings if startup_of(f) == "maybe"),
+                    "checked": scan is not None},
+        "sections": {"missing": missing, "wrong": wrong, "actions": actions},
+        "findings": findings,
     }
+
+
+def cell(value, width):
+    text = re.sub(r"\s+", " ", str(value if value not in (None, "") else "-")).strip() or "-"
+    return text if len(text) <= width else text[: width - 1] + "…"
+
+
+def table(title, headers, rows, widths):
+    print(f"\n{title} ({len(rows)})")
+    if not rows:
+        print("  (none)")
+        return
+    cells = [[cell(c, w) for c, w in zip(row, widths)] for row in rows]
+    size = [max(len(h), max(len(c[i]) for c in cells)) for i, h in enumerate(headers)]
+    line = lambda parts: print("  " + "  ".join(p.ljust(size[i]) for i, p in enumerate(parts)).rstrip())
+    line(headers)
+    line(["-" * s for s in size])
+    for c in cells:
+        line(c)
 
 
 def print_text(r):
@@ -781,12 +923,40 @@ def print_text(r):
     print(f"compared with: {', '.join(r['compared']) or '(nothing)'}")
     for n in r["notes"]:
         print(f"note: {n}")
-    for f in r["findings"]:
-        where = (f["file"] or "") + (f":{f['line']}" if f.get("line") else "")
-        subject = " ".join(x for x in (where, f["key"]) if x)
-        print(f"{f['level']:5} {f['rule']:22} " + (f"{subject}: " if subject else "") + f["message"])
+
+    s = r["startup"]
+    if not s["checked"]:
+        verdict = "START-UP: not checked (--no-code: the code was not read)"
+    elif s["blocked"]:
+        verdict = f"START-UP: {s['blocked']} finding(s) stop the app from starting" + (f", {s['maybe']} may" if s["maybe"] else "")
+    elif s["maybe"]:
+        verdict = f"START-UP: nothing certain, {s['maybe']} finding(s) may stop it (environment variables, deployment)"
+    else:
+        verdict = "START-UP: no blocker found"
+    print("\n" + verdict)
+
+    sec = r["sections"]
+    table("1. MISSING CONFIG", ["Key", "Start-up", "Why", "Now", "Read at"],
+          [[m["key"], m["startup"] or "-", m["cause"], m["state"], m["used"]] for m in sec["missing"]],
+          [48, 8, 44, 28, 44])
+    table("2. WRONG OR SUSPECT CONFIG", ["Key", "Start-up", "Problem", "Now", "Used at"],
+          [[w["key"], w["startup"] or "-", w["cause"], w["state"], w["used"]] for w in sec["wrong"]],
+          [48, 8, 60, 28, 44])
+    table("3. WHAT TO DO", ["#", "When", "Action", "Keys"],
+          [[i, {1: "before deploy", 2: "high", 3: "later"}[a["priority"]], a["action"],
+            ", ".join(a["keys"][:6]) + (f" (+{len(a['keys']) - 6})" if len(a["keys"]) > 6 else "")]
+           for i, a in enumerate(sec["actions"], 1)],
+          [3, 13, 64, 60])
+
+    notes = [f for f in r["findings"] if f["rule"] not in RULE_META]
+    if notes:
+        print("\nNotes (nothing to change by themselves)")
+        for f in notes:
+            where = (f["file"] or "") + (f":{f['line']}" if f.get("line") else "")
+            subject = " ".join(x for x in (where, f["key"]) if x)
+            print(f"  {f['rule']:22} " + (f"{subject}: " if subject else "") + f["message"])
     n = r["counts"]
-    print(f"{n['error']} error(s), {n['warn']} warning(s), {n['info']} info")
+    print(f"\n{n['error']} error(s), {n['warn']} warning(s), {n['info']} info")
 
 
 def main(argv=None):

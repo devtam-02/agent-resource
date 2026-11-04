@@ -1,7 +1,7 @@
 {
   "name": "app-config-review",
-  "description": "Read service configuration from Git config repositories (app-config-access) and review an environment's configuration against the code branch that runs with it (app-config-review): missing keys, wrong types, secrets, risky settings, drift.",
-  "version": "0.2.0",
+  "description": "Read service configuration from Git config repositories (app-config-access) and review an environment's configuration against the code branch that runs with it (app-config-review): missing keys and start-up blockers first, then wrong values, secrets, risky settings and drift, reported as three short tables.",
+  "version": "0.3.0",
   "author": {
     "name": "devtam-02"
   },
