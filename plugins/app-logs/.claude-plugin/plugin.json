@@ -1,0 +1,15 @@
+{
+  "name": "app-logs",
+  "description": "Read and analyse a service's application logs on one environment from its Kibana/Elasticsearch backend, read-only: recent lines, errors grouped by message shape with counts and first/last seen, a summary of levels, pods, timeline and top errors, pods with their running image. Filters by pod, level, logger and message. Every environment can use a different backend and field mapping, all configured in ~/.dev-cli/.env.",
+  "version": "0.1.0",
+  "author": {
+    "name": "devtam-02"
+  },
+  "keywords": [
+    "logs",
+    "kibana",
+    "elasticsearch",
+    "kubernetes",
+    "observability"
+  ]
+}
