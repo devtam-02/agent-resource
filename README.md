@@ -18,6 +18,7 @@ memories/*.md       CLAUDE.md content, imported from ~/.claude/CLAUDE.md through
 | [`app-config-review`](plugins/app-config-review/) | Service configuration in Git config repositories, read-only. Skill `app-config-access` reads it (secrets masked); skill `app-config-review`, run in a code repository, reviews an environment's config against the matching code branch (staging → `staging`, uat → `release`, else current code or a named branch). |
 | [`jira-issues`](plugins/jira-issues/) | Jira Server/DC issues, read-only, through `dev-cli --jira-tool scan-issues`: presets (my open, overdue, updated, worked, sprint, project) or JQL, cached JSON, compact digest with attention flags, one issue in full, JSON/Markdown files. |
 | [`app-logs`](plugins/app-logs/) | Application logs of a service on one environment (Kibana / Elasticsearch), read-only: summary of levels, pods, timeline and top errors, errors grouped by message shape, recent lines, pods with their running image. Each environment can use its own backend and field mapping. |
+| [`telegram-send`](plugins/telegram-send/) | Sends one local file to the configured Telegram group through dev-cli (the bot token never reaches the plugin), with the file checked first. Skill `send` on low effort; agent `telegram-sender` runs the same send on `model: haiku`. |
 
 ## Install
 
@@ -54,6 +55,7 @@ keys of every plugin listed, commented out, in its template. Current keys:
 | `canva-slides` | none (Canva login is Claude Code's OAuth, `/mcp`) |
 | `jira-issues` | `JIRA_ISSUES_DEV_CLI`, `JIRA_ISSUES_CACHE`; reads `JIRA_DEFAULT_PROJECT`. Jira URL and token belong to dev-cli (`dev-cli --jira-tool --config`) |
 | `app-logs` | `APP_LOGS_URL`, `APP_LOGS_INDEX`, `APP_LOGS_USER`, `APP_LOGS_PASSWORD`, `APP_LOGS_CA_BUNDLE`, `APP_LOGS_MODE`, `APP_LOGS_BACKENDS`, `APP_LOGS_ENV_ALIASES`, `APP_LOGS_INSTANCE_TEMPLATE`, `APP_LOGS_INSTANCE_MATCH`, `APP_LOGS_NOISE`, `APP_LOGS_FIELD_*`; the same keys again per backend (`APP_LOGS_STAGING_*`) |
+| `telegram-send` | `TELEGRAM_SEND_DEV_CLI`; reads dev-cli's own `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_TOPIC_ID` (`dev-cli --send-telegram --config`) |
 
 New plugin settings: read them with the same small reader (copy `setting()` from
 `plugins/app-config-review/skills/app-config-access/scripts/app_config.py`), add the keys to

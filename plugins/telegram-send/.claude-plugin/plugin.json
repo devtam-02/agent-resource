@@ -1,0 +1,14 @@
+{
+  "name": "telegram-send",
+  "description": "Send one local file to the configured Telegram group through dev-cli, with the file checked first (exists, size, not a credential file) and the bot token never printed. Skill `send` for the normal path; agent `telegram-sender` runs the same send on the cheapest model when the main conversation should not spend tokens on it.",
+  "version": "0.1.0",
+  "author": {
+    "name": "devtam-02"
+  },
+  "keywords": [
+    "telegram",
+    "send",
+    "file",
+    "dev-cli"
+  ]
+}
