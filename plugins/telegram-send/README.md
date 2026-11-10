@@ -1,13 +1,13 @@
 # telegram-send
 
-Claude Code plugin that sends **one local file** to the Telegram group configured in dev-cli.
+Claude Code plugin that sends **one local file or a short text message** to the Telegram group configured in dev-cli.
 dev-cli does the sending, so the bot token never reaches the plugin.
 
 | Piece | What it is |
 |---|---|
 | Skill `send` — `/telegram-send:send [file]` | The normal path. Resolves which file is meant, runs the script, reports. Frontmatter sets `effort: low`: a send needs no deliberation. |
 | Agent `telegram-sender` | The same send on **`model: haiku`, `effort: low`**. Delegate to it when the main conversation is on an expensive model and should not spend tokens on the upload. |
-| Script `skills/send/scripts/send_telegram.py` | `doctor`, `check <file>` (prints what would be sent, sends nothing), `send <file> --yes [--topic N] [--force]`. |
+| Script `skills/send/scripts/send_telegram.py` | `doctor`; `check <file>` (prints what would be sent, sends nothing); `send <file> --yes [--topic N] [--force]`; `message --yes --text T` or `message --yes --stdin [--topic N] [--force]` for a text message. |
 
 Claude also loads the skill on its own for matching requests.
 
@@ -39,6 +39,15 @@ python3 skills/send/scripts/send_telegram.py doctor
 ```
 
 It prints whether each key is set, never its value; the chat id is shown masked (`-100…547`).
+
+## Messages
+
+`message` sends plain text with `dev-cli --send-telegram --message -`. The text goes through standard
+input, never the command line, so quotes and newlines in it are safe. Before anything is sent the script
+refuses an empty text, one longer than Telegram's 4096-character limit, and text that looks like a
+credential: a bot token, a GitHub or AWS key, a private key, a JWT, `password=`/`secret=`/`token=` with a
+value, or a URL with `user:password`. `--force` overrides the credential check only, and the skill uses it
+only when the user asks for it knowing the text will sit in the group chat.
 
 ## Guards
 

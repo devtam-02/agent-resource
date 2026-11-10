@@ -13,7 +13,10 @@ anything leaves the machine, so the model does not have to reason about it:
 Commands:
   doctor                      dev-cli found, Telegram keys present (values never printed)
   check PATH                  what would be sent; nothing leaves the machine
-  send PATH --yes [--topic N] [--caption TEXT] [--force]
+  send PATH --yes [--topic N] [--force]          a file, through dev-cli --send-telegram --path
+  message --yes [--text T | --stdin] [--topic N] [--force]
+                              a text message, through dev-cli --send-telegram --message -
+                              (the text goes through stdin, never through the command line)
 
 Exit codes: 0 ok, 2 usage / not confirmed, 3 not configured, 4 file refused, 5 send failed;
 other dev-cli codes are passed through. Python 3 standard library only.
@@ -39,6 +42,21 @@ SECRET_NAMES = re.compile(
     r"|^\.env|^id_(rsa|dsa|ecdsa|ed25519)$|^\.?(npmrc|pypirc|git-credentials)$",
     re.IGNORECASE)
 SECRET_SUFFIXES = {".pem", ".key", ".p12", ".pfx", ".jks", ".keystore", ".kdbx", ".ppk", ".asc"}
+
+#: Text that looks like a credential. A message is not a file, but it lands in the same group.
+TEXT_SECRET_RES = (
+    (re.compile(r"\b\d{8,10}:[A-Za-z0-9_-]{30,}\b"), "a Telegram bot token"),
+    (re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}|\bgh[pousr]_[A-Za-z0-9]{30,}"), "a GitHub token"),
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "an AWS access key id"),
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"), "a private key"),
+    (re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}"), "a JWT"),
+    (re.compile(r"(?i)\b(password|passwd|pwd|secret|api[-_]?key|token)\b\s*[:=]\s*\S{4,}"),
+     "a value after password/secret/token"),
+    (re.compile(r"\b[a-z][a-z0-9+.-]*://[^\s/:@]+:[^\s/@]+@"), "a URL with user:password"),
+)
+
+#: Telegram's limit for one text message.
+MAX_MESSAGE_CHARS = 4096
 
 CONTROL_RE = re.compile(
     r"\x1b\[[0-9;?]*[ -/]*[@-~]"
@@ -208,6 +226,54 @@ def cmd_check(args):
     print("nothing was sent: this is `check`. Add `send ... --yes` once the user has confirmed.")
 
 
+def text_secret(text):
+    """-> the kind of credential the text seems to contain, or "" when none is seen."""
+    for pattern, label in TEXT_SECRET_RES:
+        if pattern.search(text):
+            return label
+    return ""
+
+
+def cmd_message(args):
+    if not args.yes:
+        fail("nothing was sent. A send cannot be undone, so it needs --yes, and --yes belongs "
+             "there only after the user has asked for this exact text to be sent.", EXIT_USAGE)
+    if args.stdin:
+        text = sys.stdin.read()
+    else:
+        text = args.text or ""
+    body = text.replace("\r\n", "\n").strip()
+    if not body:
+        fail("the message is empty. Nothing was sent.", EXIT_USAGE)
+    if len(body) > MAX_MESSAGE_CHARS:
+        fail(f"the message is {len(body)} characters; Telegram accepts at most "
+             f"{MAX_MESSAGE_CHARS}. Nothing was sent.", EXIT_FILE)
+    kind = text_secret(body)
+    if kind and not args.force:
+        fail(f"refusing to send: the text looks like {kind}. Sending it puts it in the group "
+             f"chat. Pass --force only if the user, knowing this, asks for it.", EXIT_FILE)
+    exe = dev_cli_exe()
+    command = [exe, "--send-telegram", "--message", "-", "-f"]
+    if args.topic:
+        command += ["--topic", str(args.topic)]
+    chat = setting("TELEGRAM_CHAT_ID")[0]
+    print(f"sending a message of {len(body)} characters to the Telegram group "
+          f"{mask_chat(chat) if chat else '(see dev-cli)'}"
+          f"{', topic ' + str(args.topic) if args.topic else ''}...")
+    if kind:
+        print(f"(--force: the text looks like {kind})")
+    try:
+        done = subprocess.run(command, input=body.encode("utf-8"), check=False)
+    except OSError as exc:
+        fail(f"could not run dev-cli: {exc}", EXIT_SEND)
+    if done.returncode == 0:
+        print("sent.")
+        return
+    hint = DEV_CLI_HINTS.get(done.returncode, "")
+    fail(f"dev-cli exited {done.returncode}, the message was not confirmed as sent."
+         f"{' ' + hint if hint else ''}", done.returncode)
+
+
 def cmd_send(args):
     if not args.yes:
         fail("nothing was sent. A send cannot be undone, so it needs --yes, and --yes belongs "
@@ -256,6 +322,16 @@ def main():
     p.add_argument("--force", action="store_true",
                    help="send although the name looks like a credential file")
     p.set_defaults(func=cmd_send)
+
+    p = sub.add_parser("message", help="send a text message (no file)")
+    source = p.add_mutually_exclusive_group(required=True)
+    source.add_argument("--text", help="the message text (keep it short; quote it)")
+    source.add_argument("--stdin", action="store_true", help="read the message from standard input")
+    p.add_argument("--yes", action="store_true", help="required: the user asked for this send")
+    p.add_argument("--topic", type=int, default=0, help="topic id of a forum group")
+    p.add_argument("--force", action="store_true",
+                   help="send although the text looks like a credential")
+    p.set_defaults(func=cmd_message)
 
     args = parser.parse_args()
     if getattr(args, "topic", 0) and not 1 <= args.topic <= 10**12:
