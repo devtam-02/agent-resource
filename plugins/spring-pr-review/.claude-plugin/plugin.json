@@ -1,7 +1,7 @@
 {
   "name": "spring-pr-review",
-  "description": "Review a Spring Boot pull request on Bitbucket, from the local git range: what each commit does (listed by commit), how far the change reaches, which config keys and database migrations it adds, changes or removes, plus code findings. Scans the range with a read-only script, then writes the report from a fixed template, saved as Markdown and optionally sent as a short Telegram message.",
-  "version": "0.1.0",
+  "description": "Review a Spring Boot pull request: what each commit does, impact, config keys and database migrations (Flyway, Liquibase YAML/XML/SQL, per database) compared with what each environment overrides, Kafka consumer and topic risks, code findings. Reads the PR, merge status and CI builds from Bitbucket Server/DC when configured (GET only), scans the git range locally, writes the report from a fixed Markdown template, optional Telegram summary when asked.",
+  "version": "0.2.0",
   "author": {
     "name": "devtam-02"
   },
@@ -11,6 +11,9 @@
     "bitbucket",
     "spring-boot",
     "migration",
+    "liquibase",
+    "flyway",
+    "kafka",
     "config"
   ]
 }
