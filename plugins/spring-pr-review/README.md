@@ -73,6 +73,12 @@ In `~/.dev-cli/.env` (or the process environment):
 Environment comparison needs the `app-config-review` plugin and its `APP_CONFIG_*` settings. Telegram
 sending uses `telegram-send`.
 
+## Shared with branch-compare
+
+`pr_scan.py`, `env_overrides.py` and `plugin_settings.py` are copied into
+`plugins/branch-compare/skills/compare/scripts/`. After editing one here, copy it there and run both
+test suites (branch-compare's `test_vendored.py` fails while the copies differ).
+
 ## Limits
 
 - Bitbucket Server / Data Center REST API 1.0 only (not Bitbucket Cloud). Read-only: no approval,

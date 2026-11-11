@@ -221,6 +221,7 @@ INCLUDE_PATH_RE = re.compile(r"""\bfile["']?\s*[:=]\s*["']?([^"'\s>,}]+)""", re.
 YAML_KEY_RE = re.compile(r"^(\s*)-?\s*([A-Za-z0-9_.\-\[\]]+)\s*:(\s+(.*)|\s*)$")
 PROPERTIES_KEY_RE = re.compile(r"^\s*(?:export\s+)?([A-Za-z0-9_.\-\[\]]+)\s*[=:]\s*(.*)$")
 SECRET_KEY_RE = re.compile(r"(?i)password|passwd|secret|token|api[-_.]?key|private[-_.]?key|credential")
+NOT_SECRET_VALUE_RE = re.compile(r"(?i)^(true|false|on|off|yes|no|none|null|\d+(ms|s|m|h|d)?)$")
 BLOCK_SCALARS = {"|", ">", "|-", ">-", "|+", ">+"}
 
 # ---------------------------------------------------------------- Java rules
@@ -566,8 +567,9 @@ def config_findings(path, changes, added_keys):
             add("medium", "config-profile", line_no, f"`{key}` {what}: đổi profile đổi toàn bộ cấu hình được nạp")
         if k.endswith("open-in-view") and v == "true":
             add("info", "open-in-view", line_no, "open-in-view = true: lazy load ngoài transaction")
-        if SECRET_KEY_RE.search(key) and value and not value.startswith("${") and value not in BLOCK_SCALARS \
-                and not value.startswith("ENC("):
+        leaf = re.split(r"[.\[]", key.rstrip("]"))[-1]   # auth.system-token.enabled is a switch, not a secret
+        if SECRET_KEY_RE.search(leaf) and value and not value.startswith("${") and value not in BLOCK_SCALARS \
+                and not value.startswith("ENC(") and not NOT_SECRET_VALUE_RE.match(value):
             add("medium", "config-secret-value", line_no,
                 f"`{key}` có giá trị viết thẳng: kiểm tra có phải secret (giá trị không in ra)")
     return findings
@@ -700,15 +702,19 @@ def changelog_index_findings(repo, head_sha, f, patch):
     new_paths = set(include_paths("\n".join(added)))
     if new_paths and f["status"] != "D":
         ordered = include_paths(run_git(repo, ["show", f"{head_sha}:{path}"], check=False))
-        highest = None
+        highest = {}   # per folder: numbering restarts in each folder (changes/v1.23/001-...)
         for p in ordered:
             n = leading_number(p)
-            if p in new_paths and n is not None and highest is not None and n < highest[0]:
+            if n is None:
+                continue
+            folder = os.path.dirname(p)
+            top = highest.get(folder)
+            if p in new_paths and top is not None and n < top[0]:
                 findings.append(finding("info", "lb-include-order", path, None,
-                                        f"`{os.path.basename(p)}` khai báo sau `{os.path.basename(highest[1])}`: "
+                                        f"`{os.path.basename(p)}` khai báo sau `{os.path.basename(top[1])}`: "
                                         "Liquibase chạy theo thứ tự khai báo, không theo số; dễ nhầm khi thêm file sau"))
-            if n is not None and (highest is None or n > highest[0]):
-                highest = (n, p)
+            if top is None or n > top[0]:
+                highest[folder] = (n, p)
     return findings
 
 

@@ -68,6 +68,13 @@ class ChangelogIndexTest(ScanCase):
         self.assertEqual(len(order), 1)
         self.assertIn("024-widen.yaml", order[0]["detail"])
 
+    def test_numbering_that_restarts_in_each_version_folder_is_not_reported(self):
+        self.liquibase_base("v1.1/006-quartz.yaml")
+        self.repo.append(MASTER, include("v1.2/001-archive.yaml"))
+        self.repo.write(f"{CHANGES}/v1.2/001-archive.yaml", "databaseChangeLog:\n  - changeSet:\n      id: 1\n")
+        self.repo.commit("add v1.2/001")
+        self.assertNotIn("lb-include-order", self.kinds(self.scan()))
+
     def test_new_change_file_nobody_includes(self):
         self.liquibase_base("001-init.yaml")
         self.repo.write(f"{CHANGES}/002-orphan.yaml", "databaseChangeLog:\n  - changeSet:\n      id: 2\n")
@@ -371,6 +378,17 @@ class ConfigTest(ScanCase):
         self.assertIn("config-secret-value", self.kinds(report))
         self.assertNotIn("hunter2", json.dumps(report, ensure_ascii=False))
         self.assertNotIn("hunter2", pr_scan.render_text(report))
+
+    def test_switches_and_durations_under_a_token_key_are_not_secrets(self):
+        self.repo.write(PROPS, "a=1\n")
+        self.repo.commit("base")
+        self.repo.branch("feature/x")
+        self.repo.append(PROPS, "auth.system-token.enabled=true\nauth.system-token.cache-ttl=300s\n"
+                                "auth.system-token.path-prefixes=/internal/\napp.jwt.secret=s3cr3tvalue\n")
+        self.repo.commit("token settings")
+        flagged = [f for f in self.scan()["findings"] if f["kind"] == "config-secret-value"]
+        self.assertEqual(len(flagged), 1)
+        self.assertIn("app.jwt.secret", flagged[0]["detail"])
 
     def test_yaml_ddl_auto_and_actuator(self):
         self.repo.write("src/main/resources/application.yml", "spring:\n  jpa:\n    hibernate:\n      ddl-auto: validate\n")
