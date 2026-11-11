@@ -19,6 +19,7 @@ memories/*.md       CLAUDE.md content, imported from ~/.claude/CLAUDE.md through
 | [`jira-issues`](plugins/jira-issues/) | Jira Server/DC issues, read-only, through `dev-cli --jira-tool scan-issues`: presets (my open, overdue, updated, worked, sprint, project) or JQL, cached JSON, compact digest with attention flags, one issue in full, JSON/Markdown files. |
 | [`app-logs`](plugins/app-logs/) | Application logs of a service on one environment (Kibana / Elasticsearch), read-only: summary of levels, pods, timeline and top errors, errors grouped by message shape, recent lines, pods with their running image. Each environment can use its own backend and field mapping. |
 | [`spring-pr-review`](plugins/spring-pr-review/) | Reviews a Spring Boot pull request: what each commit does, impact, config keys and migrations (Flyway, Liquibase, per database) against each environment's overrides, Kafka risks, code findings. Reads the PR, merge status and CI from Bitbucket Server/DC when configured (GET only), scans the git range locally, Markdown report from a fixed template, optional Telegram summary (only when asked). |
+| [`branch-compare`](plugins/branch-compare/) | Compares two branches before a merge (default staging into release): commits the target is missing with what each does, ones already cherry-picked, reverts, hotfixes to merge back; then what the merge really changes (trial merge) for Kafka, migrations, config and required keys against each environment, dependencies, API, conflicts, sensitive code. Markdown report from a fixed template. Read-only. |
 | [`telegram-send`](plugins/telegram-send/) | Sends one local file to the configured Telegram group through dev-cli (the bot token never reaches the plugin), with the file checked first. Skill `send` on low effort; agent `telegram-sender` runs the same send on `model: haiku`. |
 
 ## Install
@@ -57,6 +58,7 @@ keys of every plugin listed, commented out, in its template. Current keys:
 | `jira-issues` | `JIRA_ISSUES_DEV_CLI`, `JIRA_ISSUES_CACHE`; reads `JIRA_DEFAULT_PROJECT`. Jira URL and token belong to dev-cli (`dev-cli --jira-tool --config`) |
 | `app-logs` | `APP_LOGS_URL`, `APP_LOGS_INDEX`, `APP_LOGS_USER`, `APP_LOGS_PASSWORD`, `APP_LOGS_CA_BUNDLE`, `APP_LOGS_MODE`, `APP_LOGS_BACKENDS`, `APP_LOGS_ENV_ALIASES`, `APP_LOGS_INSTANCE_TEMPLATE`, `APP_LOGS_INSTANCE_MATCH`, `APP_LOGS_NOISE`, `APP_LOGS_FIELD_*`; the same keys again per backend (`APP_LOGS_STAGING_*`) |
 | `spring-pr-review` | `BITBUCKET_URL`, `BITBUCKET_TOKEN` (or `BITBUCKET_USER` + `BITBUCKET_PASSWORD`), `BITBUCKET_CA_BUNDLE`, `SPRING_PR_REVIEW_DIALECT`, `SPRING_PR_REVIEW_APP_CONFIG`; uses app-config-review's `APP_CONFIG_*` |
+| `branch-compare` | none of its own: reads spring-pr-review's `SPRING_PR_REVIEW_DIALECT` and `SPRING_PR_REVIEW_APP_CONFIG`; uses app-config-review's `APP_CONFIG_*` |
 | `telegram-send` | `TELEGRAM_SEND_DEV_CLI`; reads dev-cli's own `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_TOPIC_ID` (`dev-cli --send-telegram --config`) |
 
 New plugin settings: read them with the same small reader (copy `setting()` from

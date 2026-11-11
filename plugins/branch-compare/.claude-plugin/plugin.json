@@ -1,0 +1,19 @@
+{
+  "name": "branch-compare",
+  "description": "Compare two branches before a merge (default staging into release): the commits the target is missing with what each does, the ones already cherry-picked, reverts, hotfixes only on the target to merge back; then what the merge would really change, from a trial merge: Kafka topics, groups and message classes, database migrations (Flyway, Liquibase), config keys and required keys against each environment's config, environment files, dependencies, API, conflicts, sensitive business code. Markdown report from a fixed template. Read-only.",
+  "version": "0.1.0",
+  "author": {
+    "name": "devtam-02"
+  },
+  "keywords": [
+    "git",
+    "merge",
+    "release",
+    "staging",
+    "cherry-pick",
+    "migration",
+    "kafka",
+    "config",
+    "spring-boot"
+  ]
+}
