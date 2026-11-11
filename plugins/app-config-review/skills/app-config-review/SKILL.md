@@ -54,6 +54,11 @@ Tham số khi gọi bằng `/app-config-review:app-config-review`: `$ARGUMENTS`
    python3 "<thư mục skill>/scripts/config_review.py" --env <env> [--code current|<nhánh>] --json
    ```
 
+   Luôn kèm `--md review-reports/config-review-<service>-<env>-<YYYYMMDD>.md`: script tự tạo thư mục và
+   ghi **bản nháp** báo cáo theo đúng `references/report-template.md`. Bản nháp chứa phát hiện chưa kiểm
+   và ô tiếng Anh; bước 3 sửa nó thành báo cáo cuối. Báo cáo là file `.md`, không phải `.txt`; không viết
+   file khác thay cho nó. Đây là file duy nhất skill được ghi vào repo code; không `git add` hay commit nó.
+
    Nhánh được `git fetch` riêng rồi đọc qua git object: working tree và nhánh đang checkout không bị đổi.
    Exit 1 = có `error` (không phải script hỏng); 2 tham số sai/thiếu `--code`/nhiều service; 3 chưa cấu
    hình (chạy `app_config.py doctor`, xem skill `app-config-access`); 4 không tìm thấy nhánh/service;
@@ -65,13 +70,20 @@ Tham số khi gọi bằng `/app-config-review:app-config-review`: `$ARGUMENTS`
    `${...}` trong chuỗi log/SQL mà script hiểu nhầm. Sai thì bỏ khỏi bảng và nói rõ đã loại.
    Sau đó tới các `error` và `warn` đáng ngờ. `references/rules.md` nói mỗi quy tắc đúng/sai khi nào.
    Không chuyển phát hiện chưa kiểm chứng thành kết luận.
-3. **Báo cáo** bằng tiếng Việt, **ngắn gọn**, đúng 3 phần dưới đây, **mỗi phần một bảng**. Lấy sẵn dữ
-   liệu từ `sections.missing`, `sections.wrong`, `sections.actions` của `--json` (script đã sắp xếp:
-   thứ làm app không khởi chạy được đứng trước).
+3. **Báo cáo** bằng tiếng Việt, **ngắn gọn**, theo template chuẩn `references/report-template.md`: phần
+   mở đầu, đúng 3 phần dưới đây (**mỗi phần một bảng**), ghi chú. Dữ liệu lấy từ `sections.missing`,
+   `sections.wrong`, `sections.actions` của `--json` (script đã sắp xếp: thứ làm app không khởi chạy được
+   đứng trước).
 
-   Mở đầu **một dòng** gồm: service, môi trường, commit repo cấu hình, nhánh + commit code đã đọc
-   (hoặc "code hiện tại, có thay đổi chưa commit"), và kết luận khởi chạy: *"N lỗi làm app không khởi
-   chạy được"* / *"không có lỗi chặn khởi chạy"* / *"chưa kiểm vì không đọc code"*.
+   **Sửa bản nháp `.md` tại chỗ** (Edit), không viết lại từ đầu:
+   - bỏ dòng mà bước 2 đã loại, ghi lại ở "Đã loại sau khi kiểm";
+   - dịch các ô `cause`/`action`/`state` sang tiếng Việt, mỗi ô một câu;
+   - gộp các key cùng một lỗi thành một dòng;
+   - cập nhật dòng **Khởi chạy** và dòng **Tổng** nếu số liệu đổi sau khi loại.
+
+   Phần mở đầu (4 gạch đầu dòng): service và môi trường, commit repo cấu hình, nhánh + commit code đã đọc
+   (hoặc "code hiện tại, có thay đổi chưa commit"), môi trường so sánh, và kết luận khởi chạy: *"N lỗi làm
+   app không khởi chạy được"* / *"không có lỗi chặn khởi chạy"* / *"chưa kiểm vì không đọc code"*.
 
    **1. Config còn thiếu**
 
@@ -79,7 +91,7 @@ Tham số khi gọi bằng `/app-config-review:app-config-review`: `$ARGUMENTS`
    |---|---|---|---|---|
 
    - `Chặn khởi chạy`: `Có` (`startup: yes`), `Có thể` (`maybe`), `Không` (rỗng).
-   - Không thiếu key nào thì ghi một dòng "Không thiếu key nào", bỏ bảng.
+   - Không thiếu key nào thì ghi một dòng "Không thiếu key nào.", bỏ bảng.
 
    **2. Config đang/có thể sai**
 
@@ -98,7 +110,9 @@ Tham số khi gọi bằng `/app-config-review:app-config-review`: `$ARGUMENTS`
 
    - `Khi nào`: `before deploy` → "Trước khi deploy", `high` → "Sớm", `later` → "Sau".
 
-   Sau 3 bảng, nếu cần, thêm tối đa 3 gạch đầu dòng cho phần `Notes` (key dùng giá trị mặc định của
+   Trong chat, trả lời bằng nội dung báo cáo cuối (sau khi sửa) và đường dẫn đầy đủ của file `.md`.
+
+   Sau 3 bảng, nếu cần, thêm tối đa 3 gạch đầu dòng cho phần `Ghi chú` (key dùng giá trị mặc định của
    code, key không ai đọc...). `possibly-unused` nhiều key thì nhắc khai `APP_CONFIG_LIBRARY_PREFIXES`.
    Vấn đề có hệ thống (mọi service đều để mật khẩu plain text) nói **một lần**. Không chép lại toàn bộ
    output của script.

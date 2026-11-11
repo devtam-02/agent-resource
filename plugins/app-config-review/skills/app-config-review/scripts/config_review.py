@@ -959,6 +959,90 @@ def print_text(r):
     print(f"\n{n['error']} error(s), {n['warn']} warning(s), {n['info']} info")
 
 
+def md_cell(value):
+    text = re.sub(r"\s+", " ", str(value if value not in (None, "") else "-")).strip() or "-"
+    return text.replace("|", "\\|")
+
+
+#: Start-up column of the Markdown report, as SKILL.md and references/report-template.md spell it.
+MD_STARTUP = {"yes": "Có", "maybe": "Có thể", "": "Không"}
+MD_WHEN = {1: "Trước khi deploy", 2: "Sớm", 3: "Sau"}
+
+
+def md_table(title, headers, rows, empty):
+    out = [f"## {title}", ""]
+    if not rows:
+        out += [empty, ""]
+        return out
+    out.append("| " + " | ".join(headers) + " |")
+    out.append("|" + "|".join("---" for _ in headers) + "|")
+    for row in rows:
+        out.append("| " + " | ".join(md_cell(c) for c in row) + " |")
+    out.append("")
+    return out
+
+
+def render_markdown(r):
+    """Draft of the Markdown report, laid out as references/report-template.md.
+
+    It holds the script's findings before anyone has checked them; the skill confirms each one,
+    removes false positives and translates the cells, editing this file in place. No secret values:
+    the findings never carry them.
+    """
+    lines = [f"# Review cấu hình: {r['service']} / {r['environment']}", ""]
+    c = r["config"]
+    lines.append(f"- **Config**: `{c['repository']}` commit `{c['commit']}` ({', '.join(c['files']) or 'không có file'})")
+    if r["code"]:
+        k = r["code"]
+        code = k["source"] + (f" (`{k['branch']}`)" if k.get("branch") else "")
+        if k.get("commit"):
+            code += f" @ `{k['commit']}`"
+        if k.get("uncommitted_changes"):
+            code += " + thay đổi chưa commit"
+        code += f"; {k['code_files']} file nguồn; config trong code: {', '.join(k['active_code_config']) or 'không có'}"
+        lines.append(f"- **Code**: {code}")
+    else:
+        lines.append("- **Code**: không đọc (`--no-code`)")
+    lines.append(f"- **So sánh với**: {', '.join(r['compared']) or 'không có'}")
+    s = r["startup"]
+    if not s["checked"]:
+        verdict = "chưa kiểm vì không đọc code"
+    elif s["blocked"]:
+        verdict = f"{s['blocked']} lỗi làm app không khởi chạy được" + (f", {s['maybe']} có thể" if s["maybe"] else "")
+    elif s["maybe"]:
+        verdict = f"không có lỗi chắc chắn; {s['maybe']} mục có thể chặn khởi chạy (biến môi trường, deploy)"
+    else:
+        verdict = "không có lỗi chặn khởi chạy"
+    lines += [f"- **Khởi chạy**: {verdict}", ""]
+
+    sec = r["sections"]
+    lines += md_table("1. Config còn thiếu", ["Key", "Chặn khởi chạy", "Vì sao thiếu", "Hiện trạng", "Code đọc ở đâu"],
+                      [[m["key"], MD_STARTUP.get(m["startup"] or "", m["startup"]), m["cause"], m["state"], m["used"]]
+                       for m in sec["missing"]],
+                      "Không thiếu key nào.")
+    lines += md_table("2. Config đang hoặc có thể sai", ["Key", "Chặn khởi chạy", "Nguyên nhân", "Hiện trạng", "Dùng ở đâu"],
+                      [[w["key"], MD_STARTUP.get(w["startup"] or "", w["startup"]), w["cause"], w["state"], w["used"]]
+                       for w in sec["wrong"]],
+                      "Không có config sai hoặc đáng ngờ.")
+    lines += md_table("3. Hướng xử lý", ["#", "Khi nào", "Việc cần làm", "Key"],
+                      [[i, MD_WHEN[a["priority"]], a["action"],
+                        ", ".join(a["keys"][:6]) + (f" (+{len(a['keys']) - 6})" if len(a["keys"]) > 6 else "")]
+                       for i, a in enumerate(sec["actions"], 1)],
+                      "Không có việc cần làm.")
+
+    notes = [f for f in r["findings"] if f["rule"] not in RULE_META]
+    if notes:
+        lines += ["## Ghi chú", ""]
+        for f in notes:
+            where = (f["file"] or "") + (f":{f['line']}" if f.get("line") else "")
+            subject = " ".join(x for x in (where, f["key"]) if x)
+            lines.append(f"- `{f['rule']}` " + (f"{subject}: " if subject else "") + f["message"])
+        lines.append("")
+    n = r["counts"]
+    lines.append(f"Tổng: {n['error']} lỗi, {n['warn']} cảnh báo, {n['info']} thông tin.")
+    return "\n".join(lines) + "\n"
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--env", required=True, help="environment to review: staging, uat, production, ...")
@@ -969,6 +1053,7 @@ def main(argv=None):
     ap.add_argument("--no-code", action="store_true", help="configuration rules only (needs --service)")
     ap.add_argument("--no-fetch", action="store_true", help="use the cached config clone and the last fetched branch")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--md", metavar="FILE", help="also write the report as a Markdown file (.md)")
     args = ap.parse_args(argv)
     try:
         report = run(args)
@@ -978,6 +1063,16 @@ def main(argv=None):
     except subprocess.TimeoutExpired:
         print("error: git timed out", file=sys.stderr)
         return 5
+    if args.md:
+        try:
+            folder = os.path.dirname(os.path.abspath(args.md))
+            os.makedirs(folder, exist_ok=True)
+            with open(args.md, "w", encoding="utf-8") as fh:
+                fh.write(render_markdown(report))
+        except OSError as exc:
+            print(f"error: cannot write {args.md}: {exc.strerror or exc}", file=sys.stderr)
+            return 4
+        print(f"markdown report: {args.md}", file=sys.stderr)
     if args.json:
         print(json.dumps(report, ensure_ascii=False, indent=2))
     else:
