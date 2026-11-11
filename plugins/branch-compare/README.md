@@ -37,6 +37,7 @@ each environment (`env_overrides.py`), reads what was flagged and writes
 | Group | Meaning |
 |---|---|
 | missing | the merge brings it and changes at least one of its files |
+| duplicates | a later copy of a missing commit with the same patch id (a branch merged twice); counted once |
 | already on target | same patch on the target (paired by patch id), or a target commit says `cherry picked from commit <sha>` |
 | maybe on target | a target commit has the same subject but a different patch: to confirm |
 | reverted | the commit and its revert are both in the batch |

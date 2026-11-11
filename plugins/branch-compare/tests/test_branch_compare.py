@@ -105,6 +105,23 @@ class ClassificationTest(CompareCase):
         self.assertEqual(report["range"]["diff_basis"], "merge-result")
         self.assertEqual(report["range"]["merge"]["status"], "clean")
 
+    def test_the_same_patch_twice_in_the_source_is_listed_once(self):
+        r = self.repo
+        r.write(f"{J}/OrderService.java", "class OrderService {\n  int a = 1;\n  int login = 1;\n}\n")
+        first = r.commit("fix login filter")
+        first_short = self.head()
+        r.write(f"{J}/OrderService.java", "class OrderService {\n  int a = 1;\n}\n")
+        r.commit("cleanup")
+        r.git("cherry-pick", first)
+        copy = self.head()
+        report = self.compare()
+        missing = report["commits"]["missing"]
+        self.assertEqual([d["subject"] for d in missing], ["fix login filter", "cleanup"])
+        self.assertEqual(missing[0]["copies"], [copy])
+        self.assertEqual([(d["short"], d["duplicate_of"]) for d in report["commits"]["duplicates"]],
+                         [(copy, first_short)])
+        self.assertEqual(report["range"]["counts"]["duplicates"], 1)
+
     def test_conflict_lists_the_commits_of_both_sides(self):
         r = self.repo
         r.write(f"{J}/OrderService.java", "class OrderService {\n  int a = 2;\n}\n")

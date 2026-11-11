@@ -574,6 +574,23 @@ def pair_reverts(candidates):
     return [c for c in candidates if c["sha"] not in removed], pairs
 
 
+def split_duplicates(missing, ids):
+    """The same patch twice in the source (a branch merged twice, a re-cherry-pick): keep the first."""
+    first_of, unique, duplicates = {}, [], []
+    for d in missing:
+        pid = ids.get(d["sha"])
+        first = first_of.get(pid) if pid else None
+        if first is None:
+            if pid:
+                first_of[pid] = d
+            unique.append(d)
+            continue
+        first.setdefault("copies", []).append(d["short"])
+        duplicates.append({**{k: d[k] for k in ("sha", "short", "date", "author", "subject")},
+                           "duplicate_of": first["short"]})
+    return unique, duplicates
+
+
 def compare(repo, source="staging", target="release", dialect_flag="auto", merge=True,
             target_envs=DEFAULT_TARGET_ENVS, today=None):
     check_repo(repo)
@@ -633,6 +650,7 @@ def compare(repo, source="staging", target="release", dialect_flag="auto", merge
     for d in no_effect:
         for key in ("flags", "areas", "categories"):
             d.pop(key, None)
+    missing, duplicates = split_duplicates(missing, patch_ids(repo, [d["sha"] for d in missing]))
     maybe = []
     for c, t in maybe_pairs:
         d = detail(c)
@@ -697,8 +715,8 @@ def compare(repo, source="staging", target="release", dialect_flag="auto", merge
             "removed": sum(f["removed"] for f in change["files"]),
             "touches_build": category_counts.get("build", 0) > 0,
             "categories": dict(category_counts),
-            "counts": {"missing": len(missing), "already_on_target": len(already), "maybe_on_target": len(maybe),
-                       "reverted_pairs": len(reverted), "no_net_effect": len(no_effect),
+            "counts": {"missing": len(missing), "duplicates": len(duplicates), "already_on_target": len(already),
+                       "maybe_on_target": len(maybe), "reverted_pairs": len(reverted), "no_net_effect": len(no_effect),
                        "target_only": len(target_only), "merge_commits_skipped": merges_skipped},
             "authors": sorted({d["author"] for d in missing}),
             "first_date": min((d["date"] for d in missing), default=None),
@@ -707,8 +725,8 @@ def compare(repo, source="staging", target="release", dialect_flag="auto", merge
             "env_check_keys": ",".join(env_keys),
             "report_name": name,
         },
-        "commits": {"missing": missing, "maybe_on_target": maybe, "already_on_target": already,
-                    "reverted": reverted, "no_net_effect": no_effect},
+        "commits": {"missing": missing, "duplicates": duplicates, "maybe_on_target": maybe,
+                    "already_on_target": already, "reverted": reverted, "no_net_effect": no_effect},
         "target_only": target_only,
         "partial_tickets": list(partial.values()),
         "conflicts": conflict_rows,
@@ -734,7 +752,8 @@ def render_text(report):
         f"Source: {r['source_ref']} ({r['source_sha'][:8]}, {r['source_date']})  ->  "
         f"Target: {r['target_ref']} ({r['target_sha'][:8]}, {r['target_date']})  "
         f"merge-base {r['merge_base'][:8]} ({r['merge_base_date']})",
-        f"Commits: missing {n['missing']} | already on target {n['already_on_target']} | "
+        f"Commits: missing {n['missing']} (+{n['duplicates']} duplicate copies) | "
+        f"already on target {n['already_on_target']} | "
         f"maybe on target {n['maybe_on_target']} | reverted pairs {n['reverted_pairs']} | "
         f"no net effect {n['no_net_effect']} | target only {n['target_only']} | "
         f"merge commits skipped {n['merge_commits_skipped']}",
@@ -756,10 +775,15 @@ def render_text(report):
             extra.append("flags: " + ", ".join(d["flags"]))
         if d.get("areas"):
             extra.append("areas: " + ", ".join(d["areas"]))
+        if d.get("copies"):
+            extra.append("copies: " + ", ".join(d["copies"]))
         return f"  {d['short']} {d['date']} {d['author']}: {d['subject']}  " + "  ".join(extra)
 
     c = report["commits"]
     lines += [row(d) for d in c["missing"]] or ["  -"]
+    if c["duplicates"]:
+        lines += ["", "Duplicate copies in the source (same patch as an earlier missing commit):"]
+        lines += [f"  {d['short']} = {d['duplicate_of']}  {d['subject']}" for d in c["duplicates"]]
     if c["maybe_on_target"]:
         lines += ["", "Maybe on target (same subject, different patch):"]
         lines += [f"  {d['short']} ~ {d['target']['short']}  {d['subject']}  "

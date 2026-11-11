@@ -58,7 +58,8 @@ Tên trần ưu tiên `origin/<tên>`. Phần in ra là bản tóm tắt; chi ti
 - `range`: ref, sha, ngày, merge-base; `merge` (thử merge: `clean` / `conflict` + file / `unknown`);
   `diff_basis` (`merge-result` = đích → kết quả merge thử; `merge-base` khi không thử được);
   `diff_from`/`diff_to`; `counts`; `dialect`; `env_check_keys`; `report_name`.
-- `commits.missing`: commit cần đưa lên, kèm `tickets`, `categories`, `flags`, `areas`.
+- `commits.missing`: commit cần đưa lên, kèm `tickets`, `categories`, `flags`, `areas`; `copies` = các bản
+  lặp cùng nội dung trong nguồn (nhánh merge hai lần), liệt kê ở `commits.duplicates`, chỉ tính một lần.
 - `commits.maybe_on_target` (cùng tiêu đề, khác nội dung), `already_on_target` (cùng nội dung hoặc
   cherry-pick -x), `reverted` (cặp commit/revert trong đợt), `no_net_effect` (merge không đổi file nào
   của commit).

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Nhánh** | `<source_ref>` (`<sha 8>`, <ngày>) → `<target_ref>` (`<sha 8>`, <ngày>) · merge-base `<sha 8>` (<ngày>) |
-| **Commit còn thiếu** | **N** commit (<tác giả>, <ngày đầu> – <ngày cuối>) · bỏ qua M merge commit |
+| **Commit còn thiếu** | **N** commit (+D bản lặp cùng nội dung) (<tác giả>, <ngày đầu> – <ngày cuối>) · bỏ qua M merge commit |
 | **Đã có trên đích** | A cùng nội dung · B cherry-pick -x · C cùng tiêu đề khác nội dung ⚠️ · D không còn thay đổi · E cặp revert |
 | **Chỉ có trên đích** | K commit, trong đó H cần merge ngược về `<nguồn>` |
 | **Thay đổi thực khi merge** | F file · **+A / −R** (`<đích>` → kết quả merge thử) · <có/không> đụng `pom.xml`/Gradle |
@@ -32,7 +32,8 @@ vụ hoặc kỹ thuật), không chép nguyên commit message.
 |---|---|---|---|
 | `<sha>` | `<sha>` | Cùng tiêu đề, khác nội dung | <merge vẫn đổi file / nội dung đã trùng> |
 
-<!-- Ticket lên một phần (partial_tickets): thêm dòng "Ticket <X>: đã có <sha>, còn thiếu <sha>". -->
+<!-- Ticket lên một phần (partial_tickets): thêm dòng "Ticket <X>: đã có <sha>, còn thiếu <sha>".
+     Bản lặp (commits.duplicates): một dòng "<sha lặp>=<sha gốc>", merge chỉ mang nội dung một lần. -->
 
 ### Đã có trên `<đích>` (không cần đưa lên)
 
