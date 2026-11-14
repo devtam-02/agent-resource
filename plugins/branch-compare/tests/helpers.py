@@ -14,7 +14,7 @@ if SCRIPTS not in sys.path:
 SETTINGS_HOME = tempfile.mkdtemp(prefix="bc-settings-")
 os.environ["DEV_CLI_HOME"] = SETTINGS_HOME
 for name in list(os.environ):
-    if name.startswith(("BITBUCKET_", "SPRING_PR_REVIEW_")):
+    if name.startswith(("BITBUCKET_", "SPRING_PR_REVIEW_", "OBSIDIAN_", "BRANCH_COMPARE_")):
         del os.environ[name]
 # Git must not read the developer's global configuration (hooks, signing, templates).
 os.environ["GIT_CONFIG_GLOBAL"] = os.devnull

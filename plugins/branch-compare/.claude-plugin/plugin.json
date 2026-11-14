@@ -1,7 +1,7 @@
 {
   "name": "branch-compare",
-  "description": "Compare two branches before a merge (default staging into release): the commits the target is missing with what each does, the ones already cherry-picked, reverts, hotfixes only on the target to merge back; then what the merge would really change, from a trial merge: Kafka topics, groups and message classes, database migrations (Flyway, Liquibase), config keys and required keys against each environment's config, environment files, dependencies, API, conflicts, sensitive business code. Markdown report from a fixed template. Read-only.",
-  "version": "0.1.0",
+  "description": "Two skills on git history. compare: before merging one branch into another (default staging into release), the commits the target is missing, cherry-picks, reverts, hotfixes to merge back, and what the merge would really change (trial merge): Kafka, migrations, config and required keys against each environment, dependencies, API, conflicts, sensitive code. changes: what changed between two tags, branches or commits of one or more services: business flows for BA/Test to accept, then for developers a copy-ready config block, commits, endpoints and Feign calls with breaking changes, Kafka, database schema, migrations and seeds, dependencies, links between services; one note per service in an Obsidian vault, then the vault's sync, one subagent per service. Read-only on the repositories.",
+  "version": "0.2.0",
   "author": {
     "name": "devtam-02"
   },
@@ -14,6 +14,9 @@
     "migration",
     "kafka",
     "config",
-    "spring-boot"
+    "spring-boot",
+    "tag",
+    "changelog",
+    "obsidian"
   ]
 }
