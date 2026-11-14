@@ -56,6 +56,9 @@ If one of `REPO`, `FROM`/`TO`, `SCRIPTS`, `TEMPLATE`, `OUT` is missing, stop and
      `createIndex`, unique ones may stop the start-up on duplicate data), field changes and data updates;
      the same tables, "Collection" for "Bảng", the change unit id for "Context";
    - `findings` high and medium: confirm on the code before reporting; drop what the code does not support.
+   - The report compares the two revisions, not the commits: a feature added and removed again inside the
+     range is no change. Before writing "bỏ"/"thêm" (section 1 above all), check that the thing exists at
+     `from_sha` / is absent at `to_sha` (`git show <sha>:<file>`, `git grep <text> <sha>`).
    - Commits with `net_effect: false` and reverts the script did not pair (a revert re-applied in another
      form): list them in 3.2 with what happened, without re-checking each one unless it changes behaviour.
 
