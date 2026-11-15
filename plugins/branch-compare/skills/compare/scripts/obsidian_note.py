@@ -32,6 +32,7 @@ this script did not write, 5 Obsidian is not running or its CLI is not installed
 
 import argparse
 import datetime
+import hashlib
 import json
 import os
 import re
@@ -131,14 +132,26 @@ def read_props(path):
     return props
 
 
+def body_hash(text):
+    """Hash of a note's body (after the properties), normalised for line endings and trailing space."""
+    body = "\n".join(line.rstrip() for line in strip_frontmatter(text).replace("\r\n", "\n").split("\n")).strip()
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()[:16]
+
+
 def write_note(vault, path, text):
+    """Write a note this script owns. text is the body; the properties are prepended with its hash, so a later
+    run can tell whether someone edited the note in Obsidian (then it is not overwritten)."""
     if not inside(vault, os.path.dirname(path)):
         raise NoteError(f"đường dẫn ra ngoài vault: {path}")
     if os.path.exists(path):
         with open(path, encoding="utf-8", errors="replace") as fh:
-            head = fh.read(4096)
-        if MARKER not in head:
+            current = fh.read()
+        if MARKER not in current[:4096]:
             raise NoteError(f"đã có ghi chú không do branch-compare tạo, không ghi đè: {path}", 4)
+        stored = (read_props(path) or {}).get("body_hash")
+        if stored and stored != body_hash(current):
+            raise NoteError(f"ghi chú đã được sửa tay sau lần ghi trước, không ghi đè: {path} (đổi tên hoặc xóa "
+                            "ghi chú đó nếu muốn ghi lại)", 4)
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as fh:
@@ -161,6 +174,93 @@ def check_stamp(stamp):
 def note_name(stamp, from_ref, to_ref):
     """<stamp>-<from>~<to>, a name every platform accepts ('/' in a branch -> '-')."""
     return f"{stamp}-{safe_name(short_ref(from_ref))}~{safe_name(short_ref(to_ref))}"
+
+
+# ---------------------------------------------------------------- section 1: business flows
+
+BUSINESS_HEADING_RE = re.compile(r"^##\s*1\.\s*Nghiệp vụ", re.M)
+AFTER_LABEL_RE = re.compile(r"(?<![\w*])(?:\*\*)?(?:Nay|Sau)\b(?:\*\*)?\s*:"      # "Nay:" / "**Sau:**"
+                            r"|(?<=→ )(?:nay|sau)\b"                            # "trước ... → nay ..."
+                            r"|(?<=[,.;] )(?:nay|sau đó|giờ)\b(?!\s*:)", re.I)   # "trước ..., nay ..."
+
+
+def split_change(cell):
+    """Put the "after" part of a before/after cell on its own line ("... Nay: ...", "**Sau:** ...",
+    "trước ... → nay ..."). A Markdown table cell cannot hold a real line break, so it is <br>, which
+    Obsidian (and GitHub) render as one."""
+    if "<br" in cell.lower():
+        return cell
+    out, last = [], 0
+    for m in AFTER_LABEL_RE.finditer(cell):
+        head = re.sub(r"\s*[→,;]?\s*$", "", cell[last:m.start()])
+        if not head.strip():
+            continue
+        out += [head, "<br>"]
+        last = m.start()
+    out.append(cell[last:])
+    return "".join(out)
+
+
+def _cells(line):
+    return [c.strip() for c in re.split(r"(?<!\\)\|", line.strip())[1:-1]]
+
+
+def _business_table(body):
+    """(start, end, lines) of the first table under "## 1. Nghiệp vụ ...", or None."""
+    m = BUSINESS_HEADING_RE.search(body)
+    if not m:
+        return None
+    nxt = re.search(r"^## ", body[m.end():], re.M)
+    stop = m.end() + nxt.start() if nxt else len(body)
+    lines, start, pos = [], None, m.end()
+    for line in body[m.end():stop].splitlines(keepends=True):
+        if line.lstrip().startswith("|"):
+            start = pos if start is None else start
+            lines.append(line)
+        elif start is not None:
+            break
+        pos += len(line)
+    if start is None or len(lines) < 2:
+        return None
+    return start, start + sum(len(x) for x in lines), lines
+
+
+def _column(header, *words):
+    return next((i for i, h in enumerate(header) if any(w.lower() in h.lower() for w in words)), None)
+
+
+def normalize_business(body):
+    """Line breaks in the before/after column of section 1's table."""
+    found = _business_table(body)
+    if not found:
+        return body
+    start, end, lines = found
+    col = _column(_cells(lines[0]), "Thay đổi")
+    if col is None:
+        return body
+    out = lines[:2]
+    for line in lines[2:]:
+        cells = _cells(line)
+        if col < len(cells):
+            cells[col] = split_change(cells[col])
+        out.append("| " + " | ".join(cells) + " |" + ("\n" if line.endswith("\n") else ""))
+    return body[:start] + "".join(out) + body[end:]
+
+
+def business_rows(body):
+    """[(flow, change, level)] of section 1, or [] when it says there is nothing to accept."""
+    found = _business_table(body)
+    if not found:
+        return []
+    header = _cells(found[2][0])
+    name, change, level = _column(header, "Nghiệp vụ", "luồng"), _column(header, "Thay đổi"), _column(header, "Mức")
+    rows = []
+    for line in found[2][2:]:
+        cells = _cells(line)
+        get = lambda i: cells[i] if i is not None and i < len(cells) else ""  # noqa: E731
+        if get(name):
+            rows.append((get(name), split_change(get(change)), get(level)))
+    return rows
 
 
 def publish(report_md, report_json, stamp=None):
@@ -186,11 +286,14 @@ def publish(report_md, report_json, stamp=None):
         "tags": ["code-changes", "service/" + re.sub(r"[^\w/-]+", "-", g["repo"])],
     }
     path = os.path.join(base, safe_name(g["repo"]), note_name(stamp, g["from_ref"], g["to_ref"]) + ".md")
-    return write_note(vault, path, frontmatter(props) + body.lstrip("\n"))
+    body = normalize_business(body.lstrip("\n"))
+    props["body_hash"] = body_hash(body)
+    return write_note(vault, path, frontmatter(props) + body)
 
 
-def index(stamp, summary=None):
-    """Summary note of a run over several services: every service note carrying this stamp."""
+def index(stamp, summary=None, include=()):
+    """Summary note of a run over several services: every service note carrying this stamp, plus the notes
+    named in include (paths relative to the reports folder, e.g. repo/20261115-0231-release~staging.md)."""
     vault, base, _ = vault_paths()
     stamp = check_stamp(stamp)
     rows = []
@@ -205,8 +308,16 @@ def index(stamp, summary=None):
                 props = read_props(os.path.join(folder, name))
                 if props and props.get("type") == "code-changes":
                     rows.append((os.path.join(folder, name), props))
+    for rel in include:
+        path = os.path.realpath(os.path.join(base, rel))
+        props = read_props(path) if inside(vault, path) else None
+        if not props or props.get("type") != "code-changes":
+            raise NoteError(f"không phải ghi chú service của branch-compare: {rel}")
+        if all(path != r[0] for r in rows):
+            rows.append((path, props))
     if not rows:
         raise NoteError(f"không có ghi chú service nào của branch-compare với stamp {stamp} trong {base}")
+    rows.sort(key=lambda r: r[1].get("repo") or "")
     labels = {(p.get("from"), p.get("to")) for _, p in rows}
     label = "{}~{}".format(*next(iter(labels))) if len(labels) == 1 else "nhieu-moc"
     title = f"{stamp} {label}"
@@ -219,6 +330,18 @@ def index(stamp, summary=None):
                 lines += [strip_frontmatter(fh.read()).strip(), ""]
         except OSError as exc:
             raise NoteError(f"không đọc được {summary}: {exc.strerror or exc}") from None
+    lines += ["## Nghiệp vụ cần nghiệm thu", ""]
+    for path, p in rows:
+        link = os.path.relpath(path, vault)[:-3].replace(os.sep, "/")
+        with open(path, encoding="utf-8") as fh:
+            flows = business_rows(strip_frontmatter(fh.read()))
+        lines += [f"### [[{link}\\|{p.get('repo')}]]", ""]
+        if flows:
+            lines += ["| Nghiệp vụ / luồng | Thay đổi (trước → sau) | Mức |", "|---|---|---|"]
+            lines += [f"| {a} | {b} | {c} |" for a, b, c in flows]
+        else:
+            lines.append("Không có nghiệp vụ cần nghiệm thu.")
+        lines.append("")
     lines += ["## Các service", "",
               "| Service | Từ → Đến | Commit | Endpoint | Breaking | Config | Migration | Cảnh báo cao |",
               "|---|---|---:|---:|---:|---:|---:|---:|"]
@@ -232,7 +355,9 @@ def index(stamp, summary=None):
               "TABLE repo, from, to, commits, breaking, migrations, findings_high AS \"cảnh báo cao\"",
               f'FROM "{rel_base}"', f'WHERE type = "code-changes" AND stamp = "{stamp}"', "SORT repo ASC", "```", ""]
     name = f"{stamp}-{safe_name(label)}.md"
-    return write_note(vault, os.path.join(base, INDEX_DIR, name), "\n".join(lines))
+    text = "\n".join(lines)
+    text = text.replace("generated_by: branch-compare\n---", f'body_hash: "{body_hash(text)}"\ngenerated_by: branch-compare\n---', 1)
+    return write_note(vault, os.path.join(base, INDEX_DIR, name), text)
 
 
 def _git(vault, *args):
@@ -311,6 +436,8 @@ def main(argv=None):
     p = sub.add_parser("index", help="summary note of a run over several services")
     p.add_argument("--stamp", required=True)
     p.add_argument("--summary", help="Markdown inserted at the top of the summary note")
+    p.add_argument("--include", action="append", default=[],
+                   help="another service note to list, relative to the reports folder (repeatable)")
     p = sub.add_parser("sync", help="run the vault's sync command in Obsidian and wait for the commit")
     p.add_argument("--timeout", type=int, default=90, help="seconds to wait for the commit (default 90)")
     args = parser.parse_args(argv)
@@ -329,7 +456,7 @@ def main(argv=None):
             result = sync(args.timeout)
             print(f"{result['status']}: {result['detail']}")
         else:
-            print(index(args.stamp, args.summary))
+            print(index(args.stamp, args.summary, args.include))
     except NoteError as exc:
         print(f"obsidian_note: {exc}", file=sys.stderr)
         return exc.code

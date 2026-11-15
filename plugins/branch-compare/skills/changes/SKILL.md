@@ -75,8 +75,12 @@ Fetch lỗi: dùng ref đang có, ghi vào tổng hợp.
 
 ## Bước 3 — Subagent mỗi service (song song)
 
-Gọi `branch-compare:service-changes` (model Sonnet), **một subagent cho một service, tất cả trong cùng một
-lượt** (quá 6 service thì chia đợt 6). Prompt cho mỗi subagent:
+Gọi `branch-compare:service-changes`, **một subagent cho một service, tất cả trong cùng một lượt** (quá 6
+service thì chia đợt 6). Model: theo định nghĩa agent (Sonnet, effort high). Với service có diff rất lớn
+(`range.added + range.removed` trên ~15 000 dòng trong `ref_changes.py --format text` chạy trước, hoặc một
+commit đồng bộ/squash hàng chục nghìn dòng) gọi agent với `model: opus` (để effort mặc định của agent): đọc
+được nhiều hơn trước khi kết luận, ít báo sai hơn. Người dùng chỉ định model/effort thì làm theo. Prompt cho
+mỗi subagent:
 
 ```text
 REPO=<đường dẫn tuyệt đối>
@@ -100,7 +104,8 @@ Kiểm nhanh mỗi báo cáo trước khi ghi vault: đủ 8 mục, không có g
 python3 "$D/ref_changes.py" --cross "$OUT"/*.json --format text > "$OUT/cross.md"
 ```
 
-Viết `$OUT/summary.md` (không frontmatter):
+Viết `$OUT/summary.md` (không frontmatter; mục "Nghiệp vụ cần nghiệm thu" theo từng service do
+`obsidian_note.py index` tự trích từ mục 1 của các báo cáo, không chép lại vào đây):
 
 - 3–5 dòng cho cả đợt: nghiệp vụ cần nghiệm thu chéo service, việc phải làm;
 - **Liên hệ giữa các service**: bảng `cross.md` (endpoint đổi có service khác gọi qua Feign; topic dùng

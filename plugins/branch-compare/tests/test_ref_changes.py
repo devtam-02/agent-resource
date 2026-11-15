@@ -353,6 +353,12 @@ class DatabaseTest(ChangesCase):
         missing = [x["detail"] for x in self.report["findings"] if x["kind"] == "entity-column-without-migration"]
         self.assertEqual(len(missing), 1)
         self.assertIn("orders.note", missing[0])
+
+    def test_a_column_created_by_an_older_migration_is_not_reported(self):
+        rows = [{"entity": "E", "change": "changed", "table": "orders", "file": "E.java",
+                 "added": [{"column": "status", "field": "status"}, {"column": "fresh", "field": "fresh"}]}]
+        out = rc.consistency({}, rows, [], [], True, known=lambda name: name == "status")
+        self.assertEqual([x["detail"].split(" ")[0] for x in out], ["E.fresh"])
         self.assertFalse([x for x in self.report["findings"] if x["kind"] == "migration-drops-mapped-column"])
 
 
@@ -475,6 +481,27 @@ class SqlOpsTest(unittest.TestCase):
                                                   "update_data", "delete_data", "rename_table"])
         self.assertEqual(ops[4]["detail"], "không có WHERE")
         self.assertNotIn("detail", ops[5])
+
+    def test_yaml_changelog_with_an_sql_block(self):
+        text = """databaseChangeLog:
+  - changeSet:
+      id: 088-drop-unused-columns
+      author: dev
+      changes:
+        - sql:
+            splitStatements: true
+            sql: |
+              ALTER TABLE rule_bindings DROP COLUMN IF EXISTS product_scope, DROP COLUMN IF EXISTS enabled;
+              DROP TABLE IF EXISTS publish_jobs;
+      rollback:
+        - sql:
+            sql: SELECT 1;
+"""
+        ops, sets = rc.migration_ops("db/changelog/088-drop.yaml", text)
+        self.assertEqual([(o["op"], o["table"], o.get("column")) for o in ops],
+                         [("drop_column", "rule_bindings", "product_scope"), ("drop_column", "rule_bindings", "enabled"),
+                          ("drop_table", "publish_jobs", None)])
+        self.assertEqual((sets[0]["id"], sets[0]["rollback"]), ("088-drop-unused-columns", True))
 
     def test_formatted_sql_changesets(self):
         ops, sets = rc.migration_ops("db/changelog/003.sql",

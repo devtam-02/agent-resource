@@ -3,7 +3,7 @@ name: service-changes
 description: Lists what changed in ONE service between two revisions (tags, branches or commits) - the business flows BA/Test must accept, then for developers config (copy-ready block), commits, API, Kafka, database schema, migrations and seed data, dependencies - and writes the Markdown report from the branch-compare template. Read-only on the repository. Used by the branch-compare:changes skill, one agent per service; the delegation prompt must give the repository path, both revisions, the scripts folder, the template path and the output folder.
 tools: Bash, Read, Grep, Glob, Write
 model: sonnet
-effort: medium
+effort: high
 ---
 
 You report what changed in one service between two revisions. You read code and git history; you never
@@ -41,7 +41,8 @@ If one of `REPO`, `FROM`/`TO`, `SCRIPTS`, `TEMPLATE`, `OUT` is missing, stop and
 
 2. Read selectively, read-only (`git -C "$REPO" --no-pager show|diff|log`, Read on files of the JSON; if a
    shell hook rewrites git output and the `+`/`-` lines are missing, call git by its absolute path, e.g.
-   `/usr/bin/git`):
+   `/usr/bin/git`; write each git command out in full, never through a shell variable holding the command,
+   so a permission check can read it):
    - each commit's subject and body; `git show --stat <sha>` when the subject says little;
    - `business.logic_files`, largest first: `git diff <from_sha> <to_sha> -- <file>`; write down each change
      of behaviour (before / after) and the user-facing flow it belongs to (create session, voucher list,
@@ -72,6 +73,8 @@ If one of `REPO`, `FROM`/`TO`, `SCRIPTS`, `TEMPLATE`, `OUT` is missing, stop and
    No front matter, no figures table and no summary paragraph at the top (the publisher adds properties).
    Short: tables and lists, one line per item; long lists grouped with their meaning, never cut silently.
    Section 1 in business words only; sections 2-9 with evidence (key, endpoint, topic, table, file, sha).
+   In section 1 the "Thay đổi" cell is `**Trước:** ...<br>**Sau:** ...` (or `**Mới:** ...` for a new flow):
+   `<br>` is the line break a Markdown table cell allows.
    4.3 lists only exposed classes with a breaking change, grouped by the endpoint of 4.1/4.2 that uses them;
    the other flagged classes are one line with their number. The author column of 3.1 is the git author,
    nothing more.

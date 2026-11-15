@@ -10,9 +10,11 @@
 
 | # | Nghiệp vụ / luồng | Thay đổi (trước → sau) | Cần kiểm thử | Mức |
 |---|---|---|---|---|
-| 1 | <tên luồng người dùng/BA hiểu> | <trước … → nay …, 1–2 câu> | <ca kiểm thử chính, ca biên> | 🔴 / 🟡 / 🟢 |
+| 1 | <tên luồng người dùng/BA hiểu> | **Trước:** <hành vi cũ, 1 câu><br>**Sau:** <hành vi mới, 1 câu> | <ca kiểm thử chính, ca biên> | 🔴 / 🟡 / 🟢 |
 
-<!-- 🔴 đổi luật nghiệp vụ, tiền, quyền, dữ liệu bị xóa/sửa; 🟡 đổi hiển thị, thứ tự, mặc định; 🟢 bổ sung không đổi luồng cũ. -->
+<!-- 🔴 đổi luật nghiệp vụ, tiền, quyền, dữ liệu bị xóa/sửa; 🟡 đổi hiển thị, thứ tự, mặc định; 🟢 bổ sung không đổi luồng cũ.
+     Cột "Thay đổi": "**Trước:** …<br>**Sau:** …" (bảng Markdown không xuống dòng thật được; <br> hiển thị thành
+     xuống dòng). Luồng mới hoàn toàn: "**Mới:** …". Mỗi ô một ý, không gộp nhiều thay đổi vào một ô. -->
 
 **Có thể bị ảnh hưởng (kiểm thử hồi quy):**
 

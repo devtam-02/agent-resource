@@ -62,6 +62,22 @@ class PublishTest(VaultCase):
         self.assertNotIn("old: front", text)
         self.assertTrue(text.rstrip().endswith("# Thay đổi"))
 
+    def test_a_note_edited_in_obsidian_is_not_overwritten(self):
+        md, js = self.report()
+        path = on.publish(md, js, stamp="20261115-0142")
+        with open(path, encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("body_hash:", text)
+        with open(path, "w", encoding="utf-8") as fh:      # Obsidian re-saves with other line endings: still ours
+            fh.write(text.replace("\n", "\r\n"))
+        on.publish(md, js, stamp="20261115-0142")
+        with open(path, "a", encoding="utf-8") as fh:      # someone adds a line by hand
+            fh.write("\nghi chú tay\n")
+        with self.assertRaises(on.NoteError) as caught:
+            on.publish(md, js, stamp="20261115-0142")
+        self.assertEqual(caught.exception.code, 4)
+        self.assertIn("ghi chú tay", self.read(path))
+
     def test_default_stamp_is_now_and_a_bad_stamp_is_refused(self):
         md, js = self.report()
         name = os.path.basename(on.publish(md, js))
@@ -103,7 +119,68 @@ class PublishTest(VaultCase):
         self.assertIn("OBSIDIAN_VAULT", err.getvalue())
 
 
+BUSINESS = """# Thay đổi
+
+## 1. Nghiệp vụ cần nghiệm thu
+
+| # | Nghiệp vụ / luồng | Thay đổi (trước → sau) | Cần kiểm thử | Mức |
+|---|---|---|---|---|
+| 1 | Tạo phiên | Trước: phiên hết hạn sau 30 phút. Nay: phiên không hết hạn | tạo hai lần | 🔴 |
+| 2 | Tra cứu CSKH | **Mới:** tra cứu theo mã khách | lọc | 🟢 |
+
+## 2. Cấu hình
+"""
+
+
+class BusinessTest(VaultCase):
+    def test_split_change_cells(self):
+        cases = {
+            "Trước: a. Nay: b": "Trước: a.<br>Nay: b",
+            "**Trước:** a → **Sau:** b": "**Trước:** a<br>**Sau:** b",
+            "trước dùng A → nay dùng B": "trước dùng A<br>nay dùng B",
+            "**Mới:** tra cứu": "**Mới:** tra cứu",
+            "đổi /a → /b": "đổi /a → /b",
+            "Ngay: x. Sau: y": "Ngay: x.<br>Sau: y",
+            "Trước: x<br>Sau: y": "Trước: x<br>Sau: y",
+            "trước chỉ ghi cảnh báo, nay báo lỗi": "trước chỉ ghi cảnh báo<br>nay báo lỗi",
+            "giá hiện nay, ngày nay vẫn vậy": "giá hiện nay, ngày nay vẫn vậy",
+        }
+        for given, expected in cases.items():
+            self.assertEqual(on.split_change(given), expected, given)
+
+    def test_publish_splits_the_change_column_of_section_1_only(self):
+        path = on.publish(*self.report(body=BUSINESS + "| x | Trước: a. Nay: b |\n"), stamp="20261115-0142")
+        text = self.read(path)
+        self.assertIn("| Tạo phiên | Trước: phiên hết hạn sau 30 phút.<br>Nay: phiên không hết hạn | tạo hai lần |", text)
+        self.assertIn("| x | Trước: a. Nay: b |", text)      # a table outside section 1 is left alone
+
+    def test_business_rows_keep_flow_change_and_level(self):
+        rows = on.business_rows(BUSINESS)
+        self.assertEqual([r[0] for r in rows], ["Tạo phiên", "Tra cứu CSKH"])
+        self.assertEqual(rows[0][2], "🔴")
+        self.assertIn("<br>Nay:", rows[0][1])
+        self.assertEqual(on.business_rows("# x\n\n## 1. Nghiệp vụ cần nghiệm thu\n\nKhông có.\n"), [])
+
+
 class IndexTest(VaultCase):
+    def test_business_flows_per_service_and_notes_of_another_stamp(self):
+        on.publish(*self.report("order-service", BUSINESS), stamp="20261115-0237")
+        on.publish(*self.report("pricing", "# x\n\n## 1. Nghiệp vụ cần nghiệm thu\n\nKhông có.\n"),
+                   stamp="20261115-0237")
+        on.publish(*self.report("bff", BUSINESS), stamp="20261115-0231")
+        text = self.read(on.index("20261115-0237", include=["bff/20261115-0231-release~staging.md"]))
+        section = text.split("## Nghiệp vụ cần nghiệm thu", 1)[1].split("## Các service", 1)[0]
+        self.assertEqual(section.count("### [["), 3)
+        self.assertIn("| Nghiệp vụ / luồng | Thay đổi (trước → sau) | Mức |", section)
+        self.assertIn("| Tạo phiên | Trước: phiên hết hạn sau 30 phút.<br>Nay: phiên không hết hạn | 🔴 |", section)
+        self.assertIn("[[code-changes/bff/20261115-0231-release~staging\\|bff]]", section)
+        self.assertIn("Không có nghiệp vụ cần nghiệm thu.", section)
+        self.assertIn("services: 3", text)
+
+    def test_include_must_be_a_note_of_the_skill(self):
+        with self.assertRaises(on.NoteError):
+            on.index("20261115-0237", include=["../../etc/passwd"])
+
     def test_summary_note_links_every_service_note_of_the_stamp(self):
         for repo in ("order-service", "pricing"):
             on.publish(*self.report(repo), stamp="20261115-0142")

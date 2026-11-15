@@ -646,8 +646,10 @@ def liquibase_text_ops(text):
                                           "newColumnName", "newTableName", "newDataType", "indexName", "class",
                                           "path") if get(k, seg)}
             if cm.group(1) == "sql":
-                sql = re.search(r"""["']?sql["']?\s*:\s*[|>]?-?\s*(.*)""", seg, re.S)
-                ops.extend({**op, "changeset": cid} for op in sql_ops(sql.group(1) if sql else ""))
+                # "- sql:" (the change) and its "sql: |" attribute both match: each segment is read as SQL,
+                # the change's own segment only holds attributes such as splitStatements and yields nothing.
+                text = re.sub(r"""^\s*[|>][-+]?""", "", seg)
+                ops.extend({**op, "changeset": cid} for op in sql_ops(text.strip().strip("\"',")))
                 continue
             inner = "".join(f'<column name="{c}"/>' for c in re.findall(r"""["']?name["']?\s*:\s*["']?(\w+)""", seg))
             ops.extend(_lb_change(cm.group(1), a, inner, cid))
@@ -796,8 +798,10 @@ def diff_data(old, new, endpoint_list):
     return rows
 
 
-def consistency(entities_now, entity_rows, enum_rows, ops, has_migrations):
-    """Entity/migration mismatches and persisted enum changes."""
+def consistency(entities_now, entity_rows, enum_rows, ops, has_migrations, known=None):
+    """Entity/migration mismatches and persisted enum changes. known(name) -> True when an older migration
+    (outside the range) already mentions that table or column."""
+    known = known or (lambda name: False)
     out = []
     covered_cols, covered_tables = set(), set()
     for op in ops:
@@ -810,13 +814,14 @@ def consistency(entities_now, entity_rows, enum_rows, ops, has_migrations):
                 covered_cols.add((t, c))
     if has_migrations:
         for row in entity_rows:
-            if row["change"] == "added" and row["table"].lower() not in covered_tables:
+            if row["change"] == "added" and row["table"].lower() not in covered_tables \
+                    and not known(row["table"]):
                 out.append(ps.finding("medium", "entity-table-without-migration", row["file"], None,
                                       f"entity mới {row['entity']} (bảng `{row['table']}`) nhưng không thấy migration "
                                       "tạo bảng trong dải này: kiểm tra ddl-auto hoặc migration ở nơi khác"))
             for col in row.get("added", []):
                 if (row["table"].lower(), col["column"]) not in covered_cols \
-                        and not col["column"].startswith("<embedded"):
+                        and not col["column"].startswith("<embedded") and not known(col["column"]):
                     out.append(ps.finding("medium", "entity-column-without-migration", row["file"], None,
                                           f"{row['entity']}.{col['field']} → `{row['table']}.{col['column']}` mới "
                                           "nhưng không thấy migration thêm cột trong dải này"))
@@ -968,7 +973,17 @@ def changes(repo, frm="auto", to="HEAD", dialect_flag="auto", target_envs=bc.DEF
     has_migrations = bool(mig_files) or any(
         "migration" in ps.categorize(p) for p in run(repo, ["ls-tree", "-r", "--name-only", to_sha],
                                                      check=False).splitlines())
-    findings = change["findings"] + consistency(inv_b["entities"], entity_rows, enum_rows, all_ops, has_migrations)
+    tree_b = run(repo, ["ls-tree", "-r", "--name-only", to_sha], check=False).splitlines()
+    all_migrations = [p for p in tree_b if "migration" in ps.categorize(p) and not ps.TEST_RE.search(p)]
+
+    def known(name):
+        """The column or table already appears in a migration of the newer revision (e.g. created long ago)."""
+        if not all_migrations or not re.fullmatch(r"[\w.]+", name or ""):
+            return False
+        return bool(run(repo, ["grep", "-l", "-i", "-w", "-F", name, to_sha, "--", *all_migrations], check=False).strip())
+
+    findings = change["findings"] + consistency(inv_b["entities"], entity_rows, enum_rows, all_ops, has_migrations,
+                                                known)
     findings.sort(key=lambda x: (ps.SEVERITY_ORDER[x["severity"]], x["file"], x["line"] or 0))
 
     # Logic files: source code that is not only a data class, for the reader to open first.
@@ -1069,7 +1084,7 @@ def path_tail(path):
 def cross(reports):
     """Links between services of one run: a changed endpoint another service calls through Feign, a topic
     changed in one service and configured in another."""
-    rows, seen_topics = [], {}
+    rows = []
     for x in reports:
         rx = x["range"]["repo"]
         for e in x["api"]["endpoints"]:
@@ -1089,25 +1104,29 @@ def cross(reports):
                                          "đổi " + ", ".join(d["field"] for d in e.get("differences", []))
                                          if e["change"] == "changed" else "bị bỏ"),
                                      "consumer_side": f"{f['client']} · {f['handler']}"})
+    # One row per topic: the services whose config changed it, and every other service configuring it.
+    topics = {}
+    for x in reports:
+        rx = x["range"]["repo"]
         for c in x["config"]["packaged"]:
             if "topic" not in c["key"].lower():
                 continue
-            values = {v for v in (c["old"], c["new"]) if v}
-            for y in reports:
-                if y is x:
-                    continue
-                for k, v in y.get("kafka", {}).get("topics_now", {}).items():
-                    if v not in values:
-                        continue
-                    pair = (v, frozenset((rx, y["range"]["repo"])))
-                    if pair in seen_topics:     # changed in both services: one row says so
-                        seen_topics[pair]["provider"] += f" + {rx}"
-                        seen_topics[pair]["consumer"] = "(dùng chung)"
-                        continue
-                    seen_topics[pair] = {"kind": "topic", "provider": rx, "consumer": y["range"]["repo"], "what": v,
-                                         "change": c["change"], "detail": f"{c['key']}: {c['old']} → {c['new']}",
-                                         "consumer_side": k}
-                    rows.append(seen_topics[pair])
+            for v in {v for v in (c["old"], c["new"]) if v}:
+                t = topics.setdefault(v, {"changed": {}, "configured": {}})
+                t["changed"][rx] = f"{c['key']}: {c['old']} → {c['new']}"
+    for v, t in topics.items():
+        for y in reports:
+            ry = y["range"]["repo"]
+            for k, value in y.get("kafka", {}).get("topics_now", {}).items():
+                if value == v and ry not in t["changed"]:
+                    t["configured"].setdefault(ry, k)
+        if len(t["changed"]) + len(t["configured"]) < 2:
+            continue
+        rows.append({"kind": "topic", "provider": ", ".join(sorted(t["changed"])),
+                     "consumer": ", ".join(sorted(t["configured"])) or "(chỉ các service đổi)", "what": v,
+                     "change": "; ".join(sorted({d.split(": ", 1)[1] for d in t["changed"].values()})),
+                     "detail": "; ".join(f"{r}: {d}" for r, d in sorted(t["changed"].items())),
+                     "consumer_side": ", ".join(f"{r}: {k}" for r, k in sorted(t["configured"].items())) or "-"})
     return rows
 
 

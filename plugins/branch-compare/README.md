@@ -24,7 +24,7 @@ skills/changes/
   SKILL.md                       the changes workflow: scope, fetch, one subagent per service, summary, vault
   references/changes-template.md the per-service report layout (Vietnamese, Obsidian callouts)
 agents/
-  service-changes.md             one service's report (model: sonnet)
+  service-changes.md             one service's report (model: sonnet, effort: high; opus for very large ranges)
   vault-publisher.md             writes the reports into the vault (model: haiku)
 tests/                           unittest suite, offline (python3 -m unittest discover -s tests -t tests)
 ```
@@ -107,7 +107,10 @@ What `ref_changes.py` compares, at both revisions:
 Notes go to `<vault>/<dir>/<repo>/<yyyymmdd-HHMM>-<from>~<to>.md` (the repository folder is created when
 missing) with properties (`repo`, `stamp`, `from`, `to`, `commits`, `breaking`, `migrations`,
 `findings_high`, `tags`) and the marker `generated_by: branch-compare`; a run over several services adds
-`<vault>/<dir>/_tong-hop/<stamp>-<from>~<to>.md` with a table and a Dataview query. The report itself starts
+`<vault>/<dir>/_tong-hop/<stamp>-<from>~<to>.md` with each service's business flows to accept (one short
+table per service, taken from section 1 of its note), the service table and a Dataview query; `--include`
+adds notes of another stamp. In section 1 the before/after cell is split with `<br>` (a Markdown table cell
+cannot hold a line break; Obsidian renders it). The report itself starts
 with the business flows to accept (for BA/Test, no class names), then a copy-ready config block, commits and
 API, then Kafka, database (schema, migrations, data and seeds), dependencies, short. A rerun overwrites the skill's own notes; a note
 without the marker is never overwritten.
