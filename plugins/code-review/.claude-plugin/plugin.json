@@ -1,0 +1,27 @@
+{
+  "name": "code-review",
+  "description": "Review code and git history before it ships, for Spring Boot services and front-end apps (React/Next.js, Vue/Nuxt, Angular, Svelte). review-pr: a pull request or branch range - what each commit does, impact, config and database migrations against each environment, Kafka, front-end routes, API calls, env variables and security rules, plus a deep line-by-line review by the code-reviewer agent (Opus); reads Bitbucket Server/DC when configured. compare: before merging one branch into another, the missing commits and what the merge really changes. changes: what changed between two revisions of one or more services, business flows for BA/Test then config, API, database, Kafka, written into an Obsidian vault. Read-only on the repositories; Markdown reports from fixed templates.",
+  "version": "1.0.0",
+  "author": {
+    "name": "devtam-02"
+  },
+  "keywords": [
+    "review",
+    "code-review",
+    "pull-request",
+    "bitbucket",
+    "spring-boot",
+    "frontend",
+    "react",
+    "nextjs",
+    "vue",
+    "angular",
+    "merge",
+    "release",
+    "changelog",
+    "migration",
+    "kafka",
+    "config",
+    "obsidian"
+  ]
+}
