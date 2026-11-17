@@ -46,7 +46,7 @@ the `code-reviewer` agent in the background on the changed source files while it
 config keys with each environment, reads the migrations, config and flagged commits, and the front-end
 routes, API calls and environment variables. It checks every 🔴 the agent reports against the code before
 writing `review-reports/<report name>.md` from the template: commits, impact, config and database,
-front-end, code review, conclusion. Only when asked, it sends that Markdown file to Telegram (telegram-send).
+front-end, code review, conclusion. Only when asked, it sends that Markdown file to Telegram (dev-tools).
 
 ## What the scan reports
 
@@ -208,7 +208,7 @@ plugins' prefixes so that existing settings keep working.
 | `OBSIDIAN_CLI` | changes | Obsidian's command line (Settings > General > Command line interface). Default `obsidian` |
 
 The environment table needs the `app-config-review` plugin and its `APP_CONFIG_*` settings. Telegram sending
-uses `telegram-send`. Notes in the vault keep the marker `generated_by: branch-compare`, so notes written
+uses `dev-tools`. Notes in the vault keep the marker `generated_by: branch-compare`, so notes written
 before the rename are still recognised.
 
 ## Moving from spring-pr-review / branch-compare

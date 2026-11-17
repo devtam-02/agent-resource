@@ -1,5 +1,5 @@
 ---
-name: send
+name: telegram
 description: >
   Send to the configured Telegram group through dev-cli: one local file (a report, an export, a
   file just created; checked first for existence, size and credential-looking names), or a short
@@ -41,7 +41,7 @@ thông tin, không gửi kết quả của công việc khác.
 ## 2. Gửi
 
 ```bash
-S="${CLAUDE_PLUGIN_ROOT}/skills/send/scripts/send_telegram.py"
+S="${CLAUDE_PLUGIN_ROOT}/skills/telegram/scripts/send_telegram.py"
 python3 "$S" send "/đường/dẫn/tuyệt/đối" --yes                       # file
 python3 "$S" message --yes --text "Deploy staging xong"              # tin nhắn ngắn
 printf '%s' "$NOI_DUNG" | python3 "$S" message --yes --stdin        # tin nhắn nhiều dòng
@@ -52,7 +52,7 @@ printf '%s' "$NOI_DUNG" | python3 "$S" message --yes --stdin        # tin nhắn
 - `--topic <id>` khi nhóm có nhiều chủ đề và người dùng chỉ định.
 - `python3 "$S" doctor` khi nghi chưa cấu hình.
 - `${CLAUDE_PLUGIN_ROOT}` không có thì tìm:
-  `find ~/.claude/plugins -path '*telegram-send*/scripts/send_telegram.py' | head -1`
+  `find ~/.claude/plugins -path '*dev-tools*/skills/telegram/scripts/send_telegram.py' | head -1`
 
 Script tự kiểm tra trước khi gửi: file có thật, không phải thư mục, không rỗng, dưới 50 MB, và tên
 không giống file chứa bí mật.

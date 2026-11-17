@@ -1,0 +1,16 @@
+{
+  "name": "dev-tools",
+  "description": "Daily developer tools in one plugin. Skill `logs`: a service's application logs on one environment (Kibana/Elasticsearch, read-only), summary, errors grouped by message shape, recent lines, pods. Skill `jira`: Jira Server/DC issues, read-only, through dev-cli (presets or JQL, cached digest, one issue in full). Skill `telegram`: one file or a short message to the configured Telegram group through dev-cli, checked first. Agents: log-analyst (Sonnet, one per service in parallel), jira-reader (Haiku), telegram-sender (Haiku). Settings in ~/.dev-cli/.env. Formerly app-logs, jira-issues and telegram-send.",
+  "version": "1.0.0",
+  "author": {
+    "name": "devtam-02"
+  },
+  "keywords": [
+    "logs",
+    "kibana",
+    "elasticsearch",
+    "jira",
+    "telegram",
+    "dev-cli"
+  ]
+}

@@ -131,8 +131,8 @@ Chấm điểm:
 
 Không tự gửi. Khi người dùng nói "gửi telegram" hoặc truyền `--send-telegram`: soạn bản văn bản thuần
 dưới ~1500 ký tự (nhánh, số commit thiếu, các mục 🔴, việc ngoài repo, kết luận, đường dẫn báo cáo; không
-giá trị secret), gửi một lần qua skill `telegram-send:send` (hoặc subagent
-`telegram-send:telegram-sender`). "Đã gửi" chỉ khi lệnh thoát 0. Gửi file `.md` chỉ khi được nói rõ.
+giá trị secret), gửi một lần qua skill `dev-tools:telegram` (hoặc subagent
+`dev-tools:telegram-sender`). "Đã gửi" chỉ khi lệnh thoát 0. Gửi file `.md` chỉ khi được nói rõ.
 
 ## Không làm
 

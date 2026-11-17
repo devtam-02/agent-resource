@@ -1,0 +1,15 @@
+{
+  "name": "obsidian-vault",
+  "description": "Read, write and sync the user's Obsidian vault. Skill `read`: search notes by text, tag or property, read a note, a section, its properties, outline, links and backlinks, without Obsidian running. Skill `write`: create a note, append to a note or under a heading, daily note, properties; never overwrites without being asked (old version backed up), never touches .obsidian/ or .git/. Skill `sync`: runs Git Vault Sync through the Obsidian CLI and waits for the commit and the push; vault git status and conflicts. Agents: vault-reader and vault-syncer (Haiku). Settings in ~/.dev-cli/.env.",
+  "version": "0.1.0",
+  "author": {
+    "name": "devtam-02"
+  },
+  "keywords": [
+    "obsidian",
+    "notes",
+    "vault",
+    "git-vault-sync",
+    "markdown"
+  ]
+}

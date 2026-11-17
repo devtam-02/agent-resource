@@ -9,7 +9,7 @@ description: >
   a deep line-by-line code review by the code-reviewer agent (Opus). Reads the PR (title, author, merge
   status, CI builds) from Bitbucket when configured, scans the git range locally, never checks out,
   merges, approves, comments or pushes. Writes the report from a fixed Markdown template and, only when
-  asked, sends that Markdown file to Telegram through telegram-send. Use when the user asks to review a PR
+  asked, sends that Markdown file to Telegram through dev-tools. Use when the user asks to review a PR
   or a branch range, or says "review PR", "review pull request", "rà PR", "review PR #13", "review nhánh
   feature vào staging", "review code front-end", "PR này có migration không", "PR này đổi config gì",
   "gửi kết quả review lên telegram".
@@ -188,13 +188,13 @@ Không tự gửi. Chỉ khi người dùng nói "gửi telegram", "gửi kết 
 1. Báo cáo phải đã lưu ra đĩa (`review-reports/<range.report_name>`, đường dẫn tuyệt đối). Trước khi gửi,
    kiểm file không chứa giá trị secret, token hay URL có mật khẩu (`grep -nEi 'password|secret|token|://[^/ ]+:[^@ ]+@'`
    chỉ được thấy tên key hoặc `<secret>`); có thì sửa báo cáo trước.
-2. Gửi đúng một lần qua skill `telegram-send:send`:
+2. Gửi đúng một lần qua skill `dev-tools:telegram`:
    ```bash
-   python3 "<đường dẫn telegram-send>/skills/send/scripts/send_telegram.py" send "<đường dẫn tuyệt đối file .md>" --yes
+   python3 "<đường dẫn dev-tools>/skills/telegram/scripts/send_telegram.py" send "<đường dẫn tuyệt đối file .md>" --yes
    ```
-   thêm `--topic <id>` nếu người dùng chỉ định chủ đề; hoặc gọi subagent `telegram-send:telegram-sender` với
-   đường dẫn tuyệt đối của file và câu "người dùng yêu cầu gửi file này". Đường dẫn telegram-send:
-   `${CLAUDE_PLUGIN_ROOT}/../telegram-send` hoặc `find ~/.claude/plugins -path '*telegram-send*/scripts/send_telegram.py' | head -1`.
+   thêm `--topic <id>` nếu người dùng chỉ định chủ đề; hoặc gọi subagent `dev-tools:telegram-sender` với
+   đường dẫn tuyệt đối của file và câu "người dùng yêu cầu gửi file này". Đường dẫn dev-tools:
+   `${CLAUDE_PLUGIN_ROOT}/../dev-tools` hoặc `find ~/.claude/plugins -path '*dev-tools*/skills/telegram/scripts/send_telegram.py' | head -1`.
 3. "Đã gửi" chỉ khi lệnh thoát 0 và in `sent.`. Bị từ chối (tên file giống file bí mật, quá 50 MB…) thì
    không dùng `--force`; báo lý do và hỏi lại.
 4. Gửi thêm tin nhắn tóm tắt chỉ khi người dùng nói rõ muốn cả tin nhắn.

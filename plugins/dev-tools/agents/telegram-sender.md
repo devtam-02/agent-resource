@@ -23,17 +23,17 @@ is given, send nothing.
 One command:
 
 ```bash
-python3 "${CLAUDE_PLUGIN_ROOT}/skills/send/scripts/send_telegram.py" send "<absolute path>" --yes
+python3 "${CLAUDE_PLUGIN_ROOT}/skills/telegram/scripts/send_telegram.py" send "<absolute path>" --yes
 ```
 
 Add `--topic <id>` only if the prompt gave one. If `${CLAUDE_PLUGIN_ROOT}` is empty, find the
 script once with
-`find ~/.claude/plugins -path '*telegram-send*/scripts/send_telegram.py' | head -1`.
+`find ~/.claude/plugins -path '*dev-tools*/skills/telegram/scripts/send_telegram.py' | head -1`.
 
 For a message, pass the text on standard input so it never sits on the command line:
 
 ```bash
-printf '%s' "<the exact text>" | python3 "${CLAUDE_PLUGIN_ROOT}/skills/send/scripts/send_telegram.py" message --yes --stdin
+printf '%s' "<the exact text>" | python3 "${CLAUDE_PLUGIN_ROOT}/skills/telegram/scripts/send_telegram.py" message --yes --stdin
 ```
 
 The script checks the file or the text itself and refuses before anything leaves the machine

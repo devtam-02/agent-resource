@@ -5,7 +5,8 @@ Settings (~/.dev-cli/.env, or the process environment):
   OBSIDIAN_VAULT                       vault folder (the one holding .obsidian/). Required.
   BRANCH_COMPARE_OBSIDIAN_DIR          folder inside the vault for these reports. Default: code-changes
   BRANCH_COMPARE_OBSIDIAN_SYNC         on/off: run the vault's sync command after writing. Default: on
-  BRANCH_COMPARE_OBSIDIAN_SYNC_COMMAND Obsidian command id that syncs the vault. Default: git-vault-sync:sync
+  BRANCH_COMPARE_OBSIDIAN_SYNC_COMMAND Obsidian command id that syncs the vault. Default: OBSIDIAN_SYNC_COMMAND, else git-vault-sync:sync
+  OBSIDIAN_VAULT_NAME                  vault name as Obsidian knows it. Default: the folder name
   OBSIDIAN_CLI                         Obsidian's command line (Settings > General > CLI). Default: obsidian
 
 Layout: <vault>/<dir>/<repo>/<yyyymmdd-HHMM>-<from>~<to>.md for each service (the repository folder is
@@ -383,7 +384,7 @@ def sync(timeout=90, poll=2.0):
     if mode.strip().lower() in ("off", "false", "0", "no"):
         return {"status": "off", "detail": "BRANCH_COMPARE_OBSIDIAN_SYNC=off"}
     cli, _ = setting("OBSIDIAN_CLI", "obsidian")
-    command, _ = setting("BRANCH_COMPARE_OBSIDIAN_SYNC_COMMAND", "git-vault-sync:sync")
+    command, _ = setting("BRANCH_COMPARE_OBSIDIAN_SYNC_COMMAND", setting("OBSIDIAN_SYNC_COMMAND", "git-vault-sync:sync")[0])
     exe = shutil.which(os.path.expanduser(cli))
     if not exe:
         raise NoteError(f"không thấy Obsidian CLI `{cli}` (Obsidian > Settings > General > Command line "
@@ -392,7 +393,8 @@ def sync(timeout=90, poll=2.0):
     is_git = _git(vault, "rev-parse", "--is-inside-work-tree")[1] == "true"
     pending = bool(_git(vault, "status", "--porcelain", "--", rel)[1]) if is_git else True
     try:
-        proc = subprocess.run([exe, "command", f"id={command}", f"vault={os.path.basename(vault)}"],
+        name, _ = setting("OBSIDIAN_VAULT_NAME", os.path.basename(vault))
+        proc = subprocess.run([exe, "command", f"id={command}", f"vault={name}"],
                               capture_output=True, text=True, timeout=60)
     except subprocess.TimeoutExpired:
         raise NoteError("Obsidian CLI không trả lời sau 60 giây", 5) from None

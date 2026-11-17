@@ -141,7 +141,7 @@ truy vấn được). Chạy lại cùng stamp thì ghi đè ghi chú của chí
 
 Trong chat chỉ vài dòng: mỗi service một dòng (commit, breaking, migration, cảnh báo cao), liên hệ giữa
 service quan trọng nhất, đường dẫn ghi chú tổng hợp, trạng thái đồng bộ (đã commit/đẩy, hoặc chưa và vì sao). Telegram chỉ khi người dùng yêu cầu (skill
-`telegram-send:send`).
+`dev-tools:telegram`).
 
 ## Không làm
 

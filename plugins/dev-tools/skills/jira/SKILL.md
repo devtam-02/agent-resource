@@ -1,5 +1,5 @@
 ---
-name: pull
+name: jira
 description: >
   Pull issues from Jira (Server / Data Center) with dev-cli (`dev-cli --jira-tool scan-issues`),
   read-only: my open issues, overdue, recently updated, work I logged, an active sprint or open issues
@@ -19,7 +19,7 @@ không đọc, không in, không truyền token.
 
 ## Đầu vào
 
-Tham số khi gọi bằng `/jira-issues:pull`: `$ARGUMENTS`
+Tham số khi gọi bằng `/dev-tools:jira`: `$ARGUMENTS`
 
 Đổi yêu cầu thành **một** bộ lọc:
 
@@ -45,13 +45,18 @@ Tham số khi gọi bằng `/jira-issues:pull`: `$ARGUMENTS`
 Script `scripts/jira_pull.py` nằm cạnh file SKILL.md này:
 
 ```bash
-J="<thư mục skill>/scripts/jira_pull.py"
+J="${CLAUDE_PLUGIN_ROOT}/skills/jira/scripts/jira_pull.py"   # không có biến: find ~/.claude/plugins -path '*dev-tools*/scripts/jira_pull.py'
 python3 "$J" pull <bộ lọc> [--detail] [--limit 60]                  # gọi Jira, lưu cache, in digest
 python3 "$J" show [last|<file>] [--flag overdue] [--category in-progress|todo|done] \
                   [--assignee <tên>|none] [--status <tên>] [--type <loại>] [--limit N]
 python3 "$J" show --key APP-123                                    # một issue đầy đủ, không gọi Jira
 python3 "$J" doctor                                                # dev-cli + khóa Jira (không in giá trị)
 ```
+
+Kết quả lớn (sprint, project, JQL rộng: digest dài hàng trăm dòng) và người dùng chỉ hỏi một ý
+("ai đang ôm nhiều việc nhất", "issue nào của tôi sắp trễ"): giao cho subagent `dev-tools:jira-reader`
+(Haiku) với bộ lọc và câu hỏi; agent chạy `pull`/`show` và trả lời ngắn. Hỏi tiếp trên cùng kết quả
+thì tự chạy `show`, không cần agent.
 
 1. **Lấy.** Chạy `pull`. Script gọi
    `dev-cli --jira-tool scan-issues --jql <JQL> --out - -f [--detail]`, lưu JSON (schema

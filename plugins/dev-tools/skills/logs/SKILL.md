@@ -1,5 +1,5 @@
 ---
-name: analyze
+name: logs
 description: >
   Read and analyse the logs of a service on one environment (staging, uat, production, ...) from
   the Kibana / Elasticsearch backend of that environment, read-only: the most recent lines, errors
@@ -20,7 +20,7 @@ Chỉ đọc: script chỉ gọi `_search`, không ghi gì vào Kibana/Elasticse
 
 ## Đầu vào
 
-Tham số khi gọi bằng `/app-logs:analyze`: `$ARGUMENTS`
+Tham số khi gọi bằng `/dev-tools:logs`: `$ARGUMENTS`
 
 - `<service>` — tên service (ví dụ tên repo code). Instance trong log được ghép theo
   `APP_LOGS_INSTANCE_TEMPLATE` (mặc định `{env}-{service}`).
@@ -32,12 +32,24 @@ Tham số khi gọi bằng `/app-logs:analyze`: `$ARGUMENTS`
 - Khoảng thời gian: `--since now-1h` (mặc định) / `--until now`, nhận date-math (`now-15m`,
   `now-2d`) hoặc ISO 8601 (`2026-11-04T08:00:00.000Z`).
 
+## Một hay nhiều service
+
+- **Một service, một môi trường:** tự làm theo quy trình dưới.
+- **Nhiều service hoặc nhiều môi trường** ("check log 5 service sau deploy", "so log staging với
+  uat"): gọi subagent `dev-tools:log-analyst` (Sonnet), **mỗi cặp service + môi trường một agent**,
+  gửi cùng một lượt để chạy song song. Prompt cho agent: tên service, môi trường, khoảng thời gian,
+  câu hỏi của người dùng, bộ lọc (`--pod`, `--level`, `--query`) nếu có. Agent trả về tối đa ~15
+  dòng; bạn gộp thành một bảng `Service | Môi trường | Dòng lỗi | Lỗi chính | Nhận định` rồi nêu
+  điểm chung (cùng lỗi ở nhiều service → nghi phụ thuộc chung: Kafka, DB, Redis, service upstream).
+- Output thô của script (hàng trăm dòng `tail`) không đưa vào hội thoại chính: cần đọc nhiều thì giao
+  cho agent.
+
 ## Quy trình
 
 1. **Chọn lệnh theo câu hỏi** (script ở `scripts/app_logs.py` cạnh file này):
 
    ```bash
-   S="<thư mục skill>/scripts/app_logs.py"
+   S="${CLAUDE_PLUGIN_ROOT}/skills/logs/scripts/app_logs.py"   # không có biến: find ~/.claude/plugins -path '*dev-tools*/scripts/app_logs.py'
    python3 "$S" summary <service> --env <env> --since now-6h    # bắt đầu ở đây
    python3 "$S" errors  <service> --env <env> --since now-6h    # lỗi gom theo dạng message
    python3 "$S" tail    <service> --env <env> -n 50 [--level ERROR] [--query "text"]
