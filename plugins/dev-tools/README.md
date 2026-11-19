@@ -1,7 +1,7 @@
 # dev-tools
 
-Claude Code plugin with the everyday developer tools: application logs, Jira issues and Telegram
-sends. It replaces the former plugins `app-logs`, `jira-issues` and `telegram-send`; their settings
+Claude Code plugin with the everyday developer tools: application logs, Jira issues, Telegram
+sends and SQL through a web SQL Runner. It replaces the former plugins `app-logs`, `jira-issues` and `telegram-send`; their settings
 keep the same names. Skills and agents only, no legacy `commands/`.
 
 | Piece | What it does |
@@ -9,8 +9,11 @@ keep the same names. Skills and agents only, no legacy `commands/`.
 | Skill `logs` — `/dev-tools:logs <service> --env <env>` | A service's application logs on one environment, read-only (Kibana / Elasticsearch `_search` only): `summary`, `errors` grouped by message shape, `tail`, `pods`, `fields`, `doctor`. Each environment can use its own backend and field mapping. For several services or environments it starts one `log-analyst` per service in parallel. |
 | Skill `jira` — `/dev-tools:jira [preset\|keys\|"JQL"]` | Jira Server/DC issues, read-only, through `dev-cli --jira-tool scan-issues`: presets (my open, overdue, updated, worked, sprint, project) or JQL, private cache, compact digest with attention flags, one issue in full, JSON/Markdown files. |
 | Skill `telegram` — `/dev-tools:telegram [file\|text]` | One local file or a short text message to the configured Telegram group through dev-cli, checked first; the bot token never reaches the plugin. `effort: low`. |
+| Skill `sql-runner` — `/dev-tools:sql-runner --conn <C> "<SQL>"` | SQL on database connections reachable only through a web SQL Runner admin tool (VMS), through its REST API: `connections`, `schemas`, `tables`, `describe`, `query` (row cap, CSV/JSON file), `lint`. Read-only by default; never runs a write on its own: a write needs the user's approval, a dry run whose confirmation code the user types back (`--confirm`), Claude Code's prompt from the `db_write_guard` hook, `--affected-rows` for DML, a connection listed in `SQL_RUNNER_WRITE_CONNECTIONS`, and `--allow-prod` on a production-looking one. `schemas`/`tables`/`describe` are for MySQL/MariaDB; other types (Oracle, PostgreSQL, ...) through `query`. Statements the tool rejects are stopped with the rewrite (`references/gotchas.md`). |
+| Hook `db_write_guard` | PreToolUse on Bash. `sql_runner.py ... --write --confirm` and database clients (`mysql`, `psql`, `mongosh`, `redis-cli`, ...) with a write statement or fed from a file, and migration tools (`flyway migrate`, `liquibase update`, Mongock) make Claude Code ask the user; a direct call to the SQL Runner API is denied. No switch to turn it off. |
 | Agent `log-analyst` | `model: sonnet`, `effort: medium`. Logs of one service on one environment, answered in about 15 lines, so raw log output stays out of the main conversation. Read-only, Bash only. |
 | Agent `jira-reader` | `model: haiku`, `effort: low`. Runs one pull and answers one question about a large result (a sprint, a project). Read-only. |
+| Agent `sql-explorer` | `model: sonnet`, `effort: low`. Read-only exploration through `sql_runner.py` (schema inventory, comparing a schema with a DDL document), answered in about 20 lines. |
 | Agent `telegram-sender` | `model: haiku`, `effort: low`. The same send as the skill, for a long or expensive session. |
 
 Claude also loads the skills on their own for matching requests.
@@ -214,3 +217,44 @@ Exit codes: 0 sent, 2 not confirmed or bad argument, 3 not configured, 4 the fil
 5 the send failed; dev-cli's own codes are passed through.
 
 Requirements: `python3`, `dev-cli` with Telegram configured. Python 3 standard library only.
+
+## SQL Runner
+
+Settings in `~/.dev-cli/.env` (`VMS_SQL_RUNNER_HOST`, `_USERNAME`, `_PASSWORD` are read as older names):
+
+```bash
+SQL_RUNNER_URL=https://<sql-runner-host>       # base URL of the tool
+SQL_RUNNER_USER=<account>
+SQL_RUNNER_PASSWORD=<password>                 # never printed
+# SQL_RUNNER_API_PATH=/vms/api                 # API prefix
+# SQL_RUNNER_CA_BUNDLE=~/.dev-cli/ca/internal-ca.pem
+# SQL_RUNNER_TIMEOUT=60
+# SQL_RUNNER_CONNECTION=<default connection name>
+# SQL_RUNNER_WRITE_CONNECTIONS=uat_*           # connections that accept writes; not set: no writes at all
+# SQL_RUNNER_PROD_PATTERN=                     # production names (globs); default: the words prod, prd,
+                                               # production, live, dr, standby; writes there need --allow-prod
+```
+
+```bash
+R=skills/sql-runner/scripts/sql_runner.py
+python3 $R doctor
+python3 $R connections --filter uat --type mariadb
+python3 $R tables my_schema --conn UAT_db
+python3 $R describe my_schema.orders --conn UAT_db
+python3 $R query "select status, count(*) from my_schema.orders group by status" --conn UAT_db
+python3 $R query "select * from my_schema.orders where created_at > now() - interval 1 day" --conn UAT_db --out /tmp/o.csv
+python3 $R lint --file create_view.sql
+python3 $R query --file create_view.sql --conn UAT_db --write                 # dry run: plan + code
+python3 $R query --file create_view.sql --conn UAT_db --write --confirm 3F9A1C  # code typed back by the user
+python3 $R query "update my_schema.orders set status='DONE' where id in (1,2)" --conn UAT_db --write --affected-rows 2 --confirm <code>
+```
+
+The API: `POST <api>/auth/login` → bearer token; `GET <api>/wa/connection-info/get-all-public` →
+connection ids (connection strings are never printed); `POST <api>/wa/sql-runner/execute` with
+`{query, database: {id}, affectedRows?}`. The tool runs a statement as soon as it receives it (the
+browser's confirmation dialog is client-side), hence the read-only default and the confirmation steps of `rules/db-write-safety.md`. One statement per
+argument; a write runs alone. Output strips control characters; files written with `--out` are mode
+0600 and never overwritten.
+
+Exit codes: 0 ok, 2 bad usage or refused before sending, 3 not configured, 4 connection not found,
+5 network or TLS, 6 the tool refused or failed. Tests: `python3 -m unittest discover -s tests`.
